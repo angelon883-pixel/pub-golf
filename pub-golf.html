@@ -401,7 +401,7 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
   <div id="session-code-wrap" style="display:none; margin-bottom:20px;">
     <div class="session-code-display" id="session-code-display">—</div>
     <div class="session-code-note">Jouw sessiecode · stuur via WhatsApp</div>
-    <button class="btn-session-join" onclick="goToGroupSelect()">Doorgaan →</button>
+    <button class="btn-session-join" onclick="goToSessionMenu()">Doorgaan →</button>
   </div>
   <div class="session-or">— of join een bestaande sessie —</div>
   <div class="session-join-row">
@@ -409,6 +409,14 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
     <button class="btn-session-join" onclick="joinSession()">Join</button>
   </div>
   <button class="btn-session-skip" onclick="skipSession()">Overslaan, alleen spelen</button>
+</div>
+
+<!-- SESSION MENU -->
+<div class="screen" id="screen-session-menu">
+  <div class="session-title" id="session-menu-title">Sessie</div>
+  <div class="session-sub" id="session-menu-sub">Wat wil je doen?</div>
+  <button class="group-btn group-a" style="margin-bottom:20px; width:100%; max-width:280px;" onclick="openEditor()"><span class="emoji">✏️</span>ROUTE BEWERKEN</button>
+  <button class="group-btn group-b" style="width:100%; max-width:280px;" onclick="goToGroupSelect()"><span class="emoji">▶</span>SPELEN</button>
 </div>
 
 <!-- GROUP SELECT -->
@@ -431,15 +439,9 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
 <!-- EDIT -->
 <div class="screen" id="screen-edit">
   <div class="edit-inner">
-    <button class="btn-back" style="margin-bottom:16px;" onclick="goHome()">← Terug zonder opslaan</button>
+    <button class="btn-back" style="margin-bottom:16px;" onclick="closeEditor()">← Terug zonder opslaan</button>
     <div class="edit-title">Edit Course</div>
-    <div class="edit-sub">Configureer stops, wildcards en de geheime bonus hole.</div>
-
-    <div class="session-row">
-      <input class="session-join-input" id="course-code-input" maxlength="4" placeholder="XXXX" oninput="this.value=this.value.toUpperCase()" style="font-size:20px; padding:10px;">
-      <button class="btn-session-join" onclick="saveCourseRemote()">💾 Opslaan als code</button>
-      <button class="btn-session-join" onclick="loadCourseRemote()">📂 Laden</button>
-    </div>
+    <div class="edit-sub" id="edit-sub">Configureer stops, wildcards en de geheime bonus hole.</div>
 
     <!-- MOBILE tabs -->
     <div class="tab-row">
@@ -457,7 +459,7 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
         <div id="bonus-editor-mobile"></div>
       </div>
       <button class="btn-save" onclick="saveRoute()">✓ Opslaan</button>
-      <button class="btn-back" onclick="goHome()">← Terug zonder opslaan</button>
+      <button class="btn-back" onclick="closeEditor()">← Terug zonder opslaan</button>
     </div>
 
     <!-- DESKTOP two columns -->
@@ -480,7 +482,7 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
       </div>
       <div class="desktop-actions">
         <button class="btn-save" onclick="saveRoute()">✓ Opslaan</button>
-        <button class="btn-back" onclick="goHome()">← Terug zonder opslaan</button>
+        <button class="btn-back" onclick="closeEditor()">← Terug zonder opslaan</button>
       </div>
     </div>
   </div>
@@ -703,6 +705,23 @@ function chooseGroup(g) {
 }
 
 function goToGroupSelect() { show('screen-group'); }
+
+function goToSessionMenu() {
+  var title = document.getElementById('session-menu-title');
+  var sub = document.getElementById('session-menu-sub');
+  if (sessionCode) {
+    title.textContent = 'Sessie ' + sessionCode;
+    sub.textContent = 'Bewerk de route of begin met spelen.';
+  } else {
+    title.textContent = 'Sessie';
+    sub.textContent = 'Bewerk de route of begin met spelen.';
+  }
+  show('screen-session-menu');
+}
+
+function closeEditor() {
+  if (sessionCode) goToSessionMenu(); else goHome();
+}
 
 function getStops() { return course[group]; }
 
@@ -958,12 +977,26 @@ function joinSession() {
   var code = document.getElementById('session-join-input').value.trim().toUpperCase();
   if (code.length !== 4) { toast('Vul een 4-cijferige code in'); return; }
   sessionCode = code;
-  goToGroupSelect();
+  loadCourseForSession(goToSessionMenu);
 }
 
 function skipSession() {
   sessionCode = null;
-  goToGroupSelect();
+  goToSessionMenu();
+}
+
+function loadCourseForSession(done) {
+  var db = getFirebase();
+  if (!db || !sessionCode) { done(); return; }
+  db.ref('courses/' + sessionCode).once('value').then(function(snap) {
+    var data = snap.val();
+    if (data) {
+      course = data;
+      localStorage.setItem('pg_course', JSON.stringify(course));
+      toast('📂 Route voor deze sessie geladen');
+    }
+    done();
+  }).catch(function() { done(); });
 }
 
 function pushScore() {
@@ -1292,6 +1325,10 @@ function bearing(lat1,lon1,lat2,lon2) {
 
 // ── EDITOR ───────────────────────────────────
 function openEditor() {
+  var sub = document.getElementById('edit-sub');
+  sub.textContent = sessionCode
+    ? 'Configureer stops, wildcards en de geheime bonus hole. Wordt opgeslagen onder sessie ' + sessionCode + '.'
+    : 'Configureer stops, wildcards en de geheime bonus hole.';
   renderEditor('A'); renderEditor('B');
   renderWildcardEditor('mobile'); renderWildcardEditor('desktop');
   renderBonusEditor('mobile'); renderBonusEditor('desktop');
@@ -1471,8 +1508,12 @@ function saveRoute() {
   course.wildcards = readWildcards(wcSuffix);
   course.bonus = readBonus(wcSuffix);
   localStorage.setItem('pg_course', JSON.stringify(course));
+  if (sessionCode) {
+    var db = getFirebase();
+    if (db) db.ref('courses/' + sessionCode).set(course);
+  }
   toast('✅ Course opgeslagen!');
-  setTimeout(goHome, 700);
+  setTimeout(closeEditor, 700);
 }
 
 // ── GEOCODING (Nominatim / OpenStreetMap, free, no API key) ─────────
@@ -1506,38 +1547,6 @@ function geocodeBonus(suffix) {
     document.getElementById('bonus-lng-'+suffix).value = loc.lng.toFixed(6);
     toast('✅ Locatie gevonden');
   }).catch(function() { toast('❌ Adres niet gevonden'); });
-}
-
-// ── SAVED COURSES (Firebase Realtime Database) ───────────────────────
-function saveCourseRemote() {
-  var db = getFirebase();
-  if (!db) { toast('❌ Firebase niet beschikbaar'); return; }
-  course.A = readEditor('A');
-  course.B = readEditor('B');
-  var wcSuffix = window.innerWidth >= 900 ? 'desktop' : 'mobile';
-  course.wildcards = readWildcards(wcSuffix);
-  course.bonus = readBonus(wcSuffix);
-
-  var code = document.getElementById('course-code-input').value.trim().toUpperCase() || randomCode();
-  db.ref('courses/' + code).set(course).then(function() {
-    document.getElementById('course-code-input').value = code;
-    toast('💾 Opgeslagen als code ' + code);
-  }).catch(function() { toast('❌ Opslaan mislukt'); });
-}
-
-function loadCourseRemote() {
-  var db = getFirebase();
-  if (!db) { toast('❌ Firebase niet beschikbaar'); return; }
-  var code = document.getElementById('course-code-input').value.trim().toUpperCase();
-  if (code.length !== 4) { toast('Vul een 4-cijferige code in'); return; }
-  db.ref('courses/' + code).once('value').then(function(snap) {
-    var data = snap.val();
-    if (!data) { toast('❌ Code niet gevonden'); return; }
-    course = data;
-    localStorage.setItem('pg_course', JSON.stringify(course));
-    openEditor();
-    toast('📂 Course geladen');
-  }).catch(function() { toast('❌ Laden mislukt'); });
 }
 
 function addStop(g) {

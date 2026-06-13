@@ -1,6 +1,5 @@
-const CACHE = 'pubgolf-v1';
+const CACHE = 'pubgolf-v2';
 const ASSETS = [
-  './pub-golf.html',
   './manifest.json',
   'https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&display=swap',
   'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css',
@@ -30,7 +29,8 @@ self.addEventListener('activate', function(e) {
 self.addEventListener('fetch', function(e) {
   // Network first for map tiles and live score API, cache-first for everything else
   var url = e.request.url;
-  if (url.includes('firebaseio.com') || url.includes('firebasedatabase.app') || url.includes('googleapis.com') || url.includes('cartocdn') || url.includes('openstreetmap') || url.includes('nominatim')) {
+  if (e.request.mode === 'navigate' || url.endsWith('pub-golf.html') ||
+      url.includes('firebaseio.com') || url.includes('firebasedatabase.app') || url.includes('googleapis.com') || url.includes('cartocdn') || url.includes('openstreetmap') || url.includes('nominatim')) {
     e.respondWith(fetch(e.request).catch(function() { return caches.match(e.request); }));
     return;
   }
