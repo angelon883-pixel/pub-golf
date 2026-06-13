@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(unzip -o \"/Users/angel.rivera/Downloads/files.zip\")",
+      "Bash(open \"/Users/angel.rivera/Documents/Claude/Projects/Pubgolf App/pub-golf.html\")"
+    ]
+  }
+}

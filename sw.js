@@ -30,7 +30,7 @@ self.addEventListener('activate', function(e) {
 self.addEventListener('fetch', function(e) {
   // Network first for map tiles and live score API, cache-first for everything else
   var url = e.request.url;
-  if (url.includes('firebaseio.com') || url.includes('firebasedatabase.app') || url.includes('googleapis.com') || url.includes('cartocdn') || url.includes('openstreetmap')) {
+  if (url.includes('firebaseio.com') || url.includes('firebasedatabase.app') || url.includes('googleapis.com') || url.includes('cartocdn') || url.includes('openstreetmap') || url.includes('nominatim')) {
     e.respondWith(fetch(e.request).catch(function() { return caches.match(e.request); }));
     return;
   }

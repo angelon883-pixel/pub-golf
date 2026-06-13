@@ -237,6 +237,9 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
 .edit-inner { padding: 20px 14px 40px; }
 .edit-title { font-family: 'Bebas Neue', sans-serif; font-size: 38px; letter-spacing: 1px; margin-bottom: 2px; }
 .edit-sub { font-size: 12px; color: var(--muted); margin-bottom: 20px; }
+.session-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 20px; }
+.session-row .session-join-input { flex: 0 0 80px; }
+.session-row .btn-session-join { padding: 10px 14px; font-size: 14px; }
 
 /* wildcards editor */
 .wildcard-editor { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
@@ -392,10 +395,14 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
 
 <!-- SESSION CODE -->
 <div class="screen" id="screen-session">
-  <div class="session-title">Live Score</div>
-  <div class="session-sub">Deel deze code met de andere groep<br>zodat jullie elkaars score live zien.</div>
-  <div class="session-code-display" id="session-code-display">—</div>
-  <div class="session-code-note">Jouw sessiecode · stuur via WhatsApp</div>
+  <div class="session-title">Sessie</div>
+  <div class="session-sub">Maak een nieuwe sessie en deel de code,<br>of join met een code van de andere groep.</div>
+  <button class="btn-session-join" onclick="createSession()" style="margin-bottom:20px;">+ Nieuwe sessie starten</button>
+  <div id="session-code-wrap" style="display:none; margin-bottom:20px;">
+    <div class="session-code-display" id="session-code-display">—</div>
+    <div class="session-code-note">Jouw sessiecode · stuur via WhatsApp</div>
+    <button class="btn-session-join" onclick="goToGroupSelect()">Doorgaan →</button>
+  </div>
   <div class="session-or">— of join een bestaande sessie —</div>
   <div class="session-join-row">
     <input class="session-join-input" id="session-join-input" maxlength="4" placeholder="XXXX" oninput="this.value=this.value.toUpperCase()">
@@ -404,22 +411,35 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
   <button class="btn-session-skip" onclick="skipSession()">Overslaan, alleen spelen</button>
 </div>
 
+<!-- GROUP SELECT -->
+<div class="screen" id="screen-group">
+  <div class="logo" style="font-size:clamp(48px,12vw,72px);">KIES<br><span>GROEP</span></div>
+  <div class="group-select">
+    <button class="group-btn group-a" onclick="chooseGroup('A')"><span class="emoji">🔥</span>GROUP<br>A</button>
+    <button class="group-btn group-b" onclick="chooseGroup('B')"><span class="emoji">💀</span>GROUP<br>B</button>
+  </div>
+</div>
+
 <!-- INTRO -->
 <div class="screen active" id="screen-intro">
   <div class="logo">PUB<br><span>GOLF</span></div>
   <div class="tagline">May the best group win</div>
-  <div class="group-select">
-    <button class="group-btn group-a" onclick="selectGroup('A')"><span class="emoji">🔥</span>GROUP<br>A</button>
-    <button class="group-btn group-b" onclick="selectGroup('B')"><span class="emoji">💀</span>GROUP<br>B</button>
-  </div>
+  <button class="group-btn group-a" style="margin-bottom:32px; width:100%; max-width:200px;" onclick="show('screen-session')"><span class="emoji">▶</span>START</button>
   <button class="edit-link" onclick="openEditor()">⚙️ Edit stops &amp; clues</button>
 </div>
 
 <!-- EDIT -->
 <div class="screen" id="screen-edit">
   <div class="edit-inner">
+    <button class="btn-back" style="margin-bottom:16px;" onclick="goHome()">← Terug zonder opslaan</button>
     <div class="edit-title">Edit Course</div>
     <div class="edit-sub">Configureer stops, wildcards en de geheime bonus hole.</div>
+
+    <div class="session-row">
+      <input class="session-join-input" id="course-code-input" maxlength="4" placeholder="XXXX" oninput="this.value=this.value.toUpperCase()" style="font-size:20px; padding:10px;">
+      <button class="btn-session-join" onclick="saveCourseRemote()">💾 Opslaan als code</button>
+      <button class="btn-session-join" onclick="loadCourseRemote()">📂 Laden</button>
+    </div>
 
     <!-- MOBILE tabs -->
     <div class="tab-row">
@@ -656,7 +676,6 @@ var lastPos = null;
 
 // session
 var sessionCode = null;
-var sessionPeer = null; // other group's code key
 var syncInterval = null;
 var audioCtx = null;
 var lastRouteFetchPos = null; // throttle OSRM requests
@@ -671,7 +690,7 @@ function show(id) {
 function goHome() { show('screen-intro'); }
 
 // ── GAME ─────────────────────────────────────
-function selectGroup(g) {
+function chooseGroup(g) {
   group = g;
   stopIdx = 0;
   scores = [];
@@ -680,13 +699,10 @@ function selectGroup(g) {
   arrived = false;
   bonusInserted = false;
   bonusPending = false;
-
-  // generate a session code and show the sharing screen
-  sessionCode = randomCode();
-  document.getElementById('session-code-display').textContent = sessionCode;
-  document.getElementById('session-join-input').value = '';
-  show('screen-session');
+  startGame();
 }
+
+function goToGroupSelect() { show('screen-group'); }
 
 function getStops() { return course[group]; }
 
@@ -932,16 +948,22 @@ function randomCode() {
   return c;
 }
 
+function createSession() {
+  sessionCode = randomCode();
+  document.getElementById('session-code-display').textContent = sessionCode;
+  document.getElementById('session-code-wrap').style.display = 'block';
+}
+
 function joinSession() {
   var code = document.getElementById('session-join-input').value.trim().toUpperCase();
   if (code.length !== 4) { toast('Vul een 4-cijferige code in'); return; }
-  sessionPeer = code;
-  startGame();
+  sessionCode = code;
+  goToGroupSelect();
 }
 
 function skipSession() {
-  sessionPeer = null;
-  startGame();
+  sessionCode = null;
+  goToGroupSelect();
 }
 
 function pushScore() {
@@ -971,11 +993,10 @@ function startSync() {
   myRef.set({ g: group, score: 0, hole: stopIdx + 1, total: getStops().length, ts: Date.now() });
   myRef.onDisconnect().remove();
 
-  if (!sessionPeer) return;
   document.getElementById('live-score-bar').classList.add('visible');
 
-  // Listen to all players in the peer session, pick the first one whose group differs from ours
-  peerRef = db.ref('sessions/' + sessionPeer + '/players');
+  // Listen to all players in this session, pick the first one whose group differs from ours
+  peerRef = db.ref('sessions/' + sessionCode + '/players');
   peerRef.on('value', function(snap) {
     var data = snap.val();
     var myScore = scores.reduce(function(a,b){return a+b;},0);
@@ -988,6 +1009,7 @@ function startSync() {
 
     var theirEntry = null;
     Object.keys(data).forEach(function(key) {
+      if (key === playerId) return;
       var p = data[key];
       if (p.g !== myG) theirEntry = p;
     });
@@ -1243,7 +1265,7 @@ function finishGame() {
   show('screen-finish');
 }
 
-function restart() { stopGPS(); stopSync(); photos = {}; show('screen-intro'); }
+function restart() { stopGPS(); stopSync(); photos = {}; sessionCode = null; playerId = null; show('screen-intro'); }
 
 // ── TOAST ─────────────────────────────────────
 var toastTimer = null;
@@ -1307,9 +1329,12 @@ function renderEditor(g) {
       '<button class="btn-remove" onclick="removeStop(\''+g+'\','+i+')">Verwijder</button></div>' +
       '<div class="stop-fields-grid">' +
         '<div class="field"><label>Naam</label><input type="text" id="f-'+g+'-'+i+'-name" value="'+safeVal(s.name)+'"></div>' +
-        '<div class="field"><label>Adres</label><input type="text" id="f-'+g+'-'+i+'-address" value="'+safeVal(s.address)+'"></div>' +
-        '<div class="field"><label>Latitude</label><input type="number" step="0.0001" id="f-'+g+'-'+i+'-lat" value="'+s.lat+'"></div>' +
-        '<div class="field"><label>Longitude</label><input type="number" step="0.0001" id="f-'+g+'-'+i+'-lng" value="'+s.lng+'"></div>' +
+        '<div class="field full"><label>Adres</label><div style="display:flex; gap:8px;">' +
+          '<input type="text" id="f-'+g+'-'+i+'-address" value="'+safeVal(s.address)+'" style="flex:1;">' +
+          '<button class="btn-session-join" style="padding:10px 14px; font-size:13px; white-space:nowrap;" onclick="geocodeStop(\''+g+'\','+i+')">🔍 Zoek</button>' +
+        '</div></div>' +
+        '<div class="field"><label>Latitude</label><input type="number" step="0.000001" id="f-'+g+'-'+i+'-lat" value="'+s.lat+'"></div>' +
+        '<div class="field"><label>Longitude</label><input type="number" step="0.000001" id="f-'+g+'-'+i+'-lng" value="'+s.lng+'"></div>' +
         '<div class="field"><label>Par</label><input type="number" min="1" max="9" id="f-'+g+'-'+i+'-par" value="'+s.par+'"></div>' +
         '<div class="field"><label>Challenge Titel</label><input type="text" id="f-'+g+'-'+i+'-clueTitle" value="'+safeVal(s.clueTitle)+'"></div>' +
         '<div class="field full"><label>Challenge Omschrijving</label><textarea id="f-'+g+'-'+i+'-challenge">'+safeText(s.challenge)+'</textarea></div>' +
@@ -1376,10 +1401,13 @@ function renderBonusEditor(suffix) {
     '<div class="bonus-fields'+(enabled?' visible':'')+'" id="bonus-fields-'+suffix+'">' +
       '<div class="field"><label>Na hole #</label><input type="number" min="1" max="20" id="bonus-trigger-'+suffix+'" value="'+(b.triggerAfterHole||4)+'"></div>' +
       '<div class="field"><label>Naam</label><input type="text" id="bonus-name-'+suffix+'" value="'+safeVal(b.name||'')+'"></div>' +
-      '<div class="field"><label>Adres</label><input type="text" id="bonus-addr-'+suffix+'" value="'+safeVal(b.address||'')+'"></div>' +
+      '<div class="field"><label>Adres</label><div style="display:flex; gap:8px;">' +
+        '<input type="text" id="bonus-addr-'+suffix+'" value="'+safeVal(b.address||'')+'" style="flex:1;">' +
+        '<button class="btn-session-join" style="padding:10px 14px; font-size:13px; white-space:nowrap;" onclick="geocodeBonus(\''+suffix+'\')">🔍 Zoek</button>' +
+      '</div></div>' +
       '<div class="field coords-pair">' +
-        '<div><label>Latitude</label><input type="number" step="0.0001" id="bonus-lat-'+suffix+'" value="'+(b.lat||52.3702)+'"></div>' +
-        '<div><label>Longitude</label><input type="number" step="0.0001" id="bonus-lng-'+suffix+'" value="'+(b.lng||4.8952)+'"></div>' +
+        '<div><label>Latitude</label><input type="number" step="0.000001" id="bonus-lat-'+suffix+'" value="'+(b.lat||52.3702)+'"></div>' +
+        '<div><label>Longitude</label><input type="number" step="0.000001" id="bonus-lng-'+suffix+'" value="'+(b.lng||4.8952)+'"></div>' +
       '</div>' +
       '<div class="field"><label>Par</label><input type="number" min="1" max="9" id="bonus-par-'+suffix+'" value="'+(b.par||2)+'"></div>' +
       '<div class="field"><label>Challenge</label><textarea id="bonus-challenge-'+suffix+'">'+safeText(b.challenge||'')+'</textarea></div>' +
@@ -1445,6 +1473,71 @@ function saveRoute() {
   localStorage.setItem('pg_course', JSON.stringify(course));
   toast('✅ Course opgeslagen!');
   setTimeout(goHome, 700);
+}
+
+// ── GEOCODING (Nominatim / OpenStreetMap, free, no API key) ─────────
+function geocodeAddress(address) {
+  var url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(address);
+  return fetch(url, { headers: { 'Accept-Language': 'nl' } })
+    .then(function(r) { return r.json(); })
+    .then(function(results) {
+      if (!results || !results[0]) throw new Error('not found');
+      return { lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon) };
+    });
+}
+
+function geocodeStop(g, i) {
+  var address = document.getElementById('f-'+g+'-'+i+'-address').value;
+  if (!address) { toast('Vul eerst een adres in'); return; }
+  toast('🔍 Zoeken…');
+  geocodeAddress(address).then(function(loc) {
+    document.getElementById('f-'+g+'-'+i+'-lat').value = loc.lat.toFixed(6);
+    document.getElementById('f-'+g+'-'+i+'-lng').value = loc.lng.toFixed(6);
+    toast('✅ Locatie gevonden');
+  }).catch(function() { toast('❌ Adres niet gevonden'); });
+}
+
+function geocodeBonus(suffix) {
+  var address = document.getElementById('bonus-addr-'+suffix).value;
+  if (!address) { toast('Vul eerst een adres in'); return; }
+  toast('🔍 Zoeken…');
+  geocodeAddress(address).then(function(loc) {
+    document.getElementById('bonus-lat-'+suffix).value = loc.lat.toFixed(6);
+    document.getElementById('bonus-lng-'+suffix).value = loc.lng.toFixed(6);
+    toast('✅ Locatie gevonden');
+  }).catch(function() { toast('❌ Adres niet gevonden'); });
+}
+
+// ── SAVED COURSES (Firebase Realtime Database) ───────────────────────
+function saveCourseRemote() {
+  var db = getFirebase();
+  if (!db) { toast('❌ Firebase niet beschikbaar'); return; }
+  course.A = readEditor('A');
+  course.B = readEditor('B');
+  var wcSuffix = window.innerWidth >= 900 ? 'desktop' : 'mobile';
+  course.wildcards = readWildcards(wcSuffix);
+  course.bonus = readBonus(wcSuffix);
+
+  var code = document.getElementById('course-code-input').value.trim().toUpperCase() || randomCode();
+  db.ref('courses/' + code).set(course).then(function() {
+    document.getElementById('course-code-input').value = code;
+    toast('💾 Opgeslagen als code ' + code);
+  }).catch(function() { toast('❌ Opslaan mislukt'); });
+}
+
+function loadCourseRemote() {
+  var db = getFirebase();
+  if (!db) { toast('❌ Firebase niet beschikbaar'); return; }
+  var code = document.getElementById('course-code-input').value.trim().toUpperCase();
+  if (code.length !== 4) { toast('Vul een 4-cijferige code in'); return; }
+  db.ref('courses/' + code).once('value').then(function(snap) {
+    var data = snap.val();
+    if (!data) { toast('❌ Code niet gevonden'); return; }
+    course = data;
+    localStorage.setItem('pg_course', JSON.stringify(course));
+    openEditor();
+    toast('📂 Course geladen');
+  }).catch(function() { toast('❌ Laden mislukt'); });
 }
 
 function addStop(g) {

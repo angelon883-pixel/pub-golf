@@ -117,6 +117,12 @@ De app gebruikt Firebase Realtime Database om scores en live locatie tussen beid
            ".write": true,
            ".indexOn": ["g"]
          }
+       },
+       "courses": {
+         "$code": {
+           ".read": true,
+           ".write": true
+         }
        }
      }
    }
