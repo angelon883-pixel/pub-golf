@@ -102,8 +102,10 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
 .travel-time span { color: var(--text); }
 
 /* map */
-.map-wrap { border-radius: 10px; overflow: hidden; border: 1px solid var(--border); margin-bottom: 12px; }
+.map-wrap { border-radius: 10px; overflow: hidden; border: 1px solid var(--border); margin-bottom: 12px; cursor: pointer; }
+.map-wrap.expanded { position: fixed; inset: 0; z-index: 1000; border-radius: 0; margin: 0; border: none; }
 #stop-map { height: 260px; width: 100%; background: #110500; }
+.map-wrap.expanded #stop-map { height: 100%; }
 .leaflet-popup-content-wrapper { background: #1a0800 !important; color: var(--text) !important; border: 1px solid var(--border) !important; border-radius: 8px !important; box-shadow: 0 4px 20px rgba(0,0,0,0.6) !important; font-family: 'DM Mono',monospace !important; font-size: 12px !important; }
 .leaflet-popup-tip { background: #1a0800 !important; }
 .leaflet-popup-close-button { color: var(--muted) !important; }
@@ -396,23 +398,23 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
 <!-- SESSION CODE -->
 <div class="screen" id="screen-session">
   <div class="session-title">Sessie</div>
-  <div class="session-sub">Maak een nieuwe sessie en deel de code,<br>of join met een code van de andere groep.</div>
-  <button class="btn-session-join" onclick="createSession()" style="margin-bottom:20px;">+ Nieuwe sessie starten</button>
-  <div id="session-code-wrap" style="display:none; margin-bottom:20px;">
-    <div class="session-code-display" id="session-code-display">—</div>
-    <div class="session-code-note">Jouw sessiecode · stuur via WhatsApp</div>
-    <button class="btn-session-join" onclick="goToSessionMenu()">Doorgaan →</button>
-  </div>
+  <div class="session-sub">Maak een nieuwe sessie en stel de route in,<br>of join met een code van de andere groep.</div>
+  <button class="btn-session-join" onclick="createSession()" style="margin-bottom:20px;">+ Nieuwe sessie aanmaken</button>
   <div class="session-or">— of join een bestaande sessie —</div>
   <div class="session-join-row">
     <input class="session-join-input" id="session-join-input" maxlength="4" placeholder="XXXX" oninput="this.value=this.value.toUpperCase()">
     <button class="btn-session-join" onclick="joinSession()">Join</button>
+  </div>
+  <div id="saved-sessions-wrap" style="display:none; margin-top:20px; width:100%; max-width:280px;">
+    <div class="session-or">📁 Opgeslagen sessies</div>
+    <div id="saved-sessions-list"></div>
   </div>
   <button class="btn-session-skip" onclick="skipSession()">Overslaan, alleen spelen</button>
 </div>
 
 <!-- SESSION MENU -->
 <div class="screen" id="screen-session-menu">
+  <button class="btn-back" style="margin-bottom:20px; max-width:280px;" onclick="show('screen-session'); renderSavedSessions();">← Terug</button>
   <div class="session-title" id="session-menu-title">Sessie</div>
   <div class="session-sub" id="session-menu-sub">Wat wil je doen?</div>
   <button class="group-btn group-a" style="margin-bottom:20px; width:100%; max-width:280px;" onclick="openEditor()"><span class="emoji">✏️</span>ROUTE BEWERKEN</button>
@@ -421,6 +423,7 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
 
 <!-- GROUP SELECT -->
 <div class="screen" id="screen-group">
+  <button class="btn-back" style="margin-bottom:20px; max-width:280px;" onclick="goToSessionMenu()">← Terug</button>
   <div class="logo" style="font-size:clamp(48px,12vw,72px);">KIES<br><span>GROEP</span></div>
   <div class="group-select">
     <button class="group-btn group-a" onclick="chooseGroup('A')"><span class="emoji">🔥</span>GROUP<br>A</button>
@@ -432,8 +435,7 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
 <div class="screen active" id="screen-intro">
   <div class="logo">PUB<br><span>GOLF</span></div>
   <div class="tagline">May the best group win</div>
-  <button class="group-btn group-a" style="margin-bottom:32px; width:100%; max-width:200px;" onclick="show('screen-session')"><span class="emoji">▶</span>START</button>
-  <button class="edit-link" onclick="openEditor()">⚙️ Edit stops &amp; clues</button>
+  <button class="group-btn group-a" style="margin-bottom:32px; width:100%; max-width:200px;" onclick="show('screen-session'); renderSavedSessions();"><span class="emoji">▶</span>START</button>
 </div>
 
 <!-- EDIT -->
@@ -529,7 +531,7 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
       <div class="stop-address" id="stop-addr">—</div>
       <div class="travel-time" id="travel-time" style="display:none">🚶 <span id="travel-time-val">—</span></div>
 
-      <div class="map-wrap"><div id="stop-map"></div></div>
+      <div class="map-wrap" onclick="toggleMapExpand()"><div id="stop-map"></div></div>
 
       <div class="dist-row">
         <div class="compass-circle" id="compass">🧭</div>
@@ -967,22 +969,58 @@ function randomCode() {
   return c;
 }
 
+function getSavedSessions() {
+  return JSON.parse(localStorage.getItem('pg_saved_sessions') || '[]');
+}
+
+function saveSessionEntry(code, name) {
+  if (!name) return;
+  var list = getSavedSessions().filter(function(s) { return s.code !== code; });
+  list.unshift({ code: code, name: name });
+  localStorage.setItem('pg_saved_sessions', JSON.stringify(list));
+}
+
+function renderSavedSessions() {
+  var wrap = document.getElementById('saved-sessions-wrap');
+  var list = getSavedSessions();
+  if (!list.length) { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  document.getElementById('saved-sessions-list').innerHTML = list.map(function(s) {
+    return '<button class="btn-session-join saved-session-row" onclick="openSavedSession(\'' + s.code + '\')">' +
+           s.name + ' <span class="session-code-note">(' + s.code + ')</span></button>';
+  }).join('');
+}
+
+function openSavedSession(code) {
+  sessionCode = code;
+  loadCourseForSession(goToSessionMenu);
+}
+
 function createSession() {
   sessionCode = randomCode();
-  document.getElementById('session-code-display').textContent = sessionCode;
-  document.getElementById('session-code-wrap').style.display = 'block';
+  var name = prompt('Geef deze sessie een naam (bv. "Spanje 2026"):', '');
+  saveSessionEntry(sessionCode, name && name.trim());
+  openEditor();
 }
 
 function joinSession() {
   var code = document.getElementById('session-join-input').value.trim().toUpperCase();
   if (code.length !== 4) { toast('Vul een 4-cijferige code in'); return; }
   sessionCode = code;
+  var name = prompt('Naam voor deze sessie opslaan? (leeg = niet opslaan)', '');
+  if (name && name.trim()) saveSessionEntry(sessionCode, name.trim());
   loadCourseForSession(goToSessionMenu);
 }
 
 function skipSession() {
   sessionCode = null;
   goToSessionMenu();
+}
+
+function toggleMapExpand() {
+  var wrap = document.querySelector('.map-wrap');
+  wrap.classList.toggle('expanded');
+  setTimeout(function() { if (map) map.invalidateSize(); }, 260);
 }
 
 function loadCourseForSession(done) {
