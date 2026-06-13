@@ -1,0 +1,1468 @@
+<!DOCTYPE html>
+<html lang="nl">
+<!--
+  PUB GOLF APP
+  ============
+  Één bestand bevat de volledige app. Structuur:
+
+  1. HEAD          — meta tags, PWA manifest, fonts, Leaflet CSS/JS
+  2. CSS           — alle stijlen (zoek op "── SECTIENAAM ──" om snel te navigeren)
+  3. HTML          — schermen: intro, session, edit, game, bonus, finish
+  4. JAVASCRIPT    — logica (zoek op "── SECTIENAAM ──" om snel te navigeren)
+
+  KLEURENSCHEMA (pas aan in :root)
+  --primary:   #FF6B00  hoofdkleur (oranje)
+  --secondary: #FF1744  tweede kleur (rood)
+  --gold:      #FFD600  bonus/wildcards
+  --dark:      #0a0500  achtergrond
+  --card:      #160800  kaarten
+  --border:    #3a1500  randen
+  --text:      #ffe8d0  tekst
+  --muted:     #7a4020  subtiele tekst
+
+  GPS PROXIMITY (pas aan in onPosition)
+  Arrival radius: 80 meter
+
+  DEPENDENCIES (CDN, geen installatie nodig)
+  - Leaflet.js 1.9.4    kaart
+  - OSRM API            looproutes (gratis, geen key)
+  - kvdb.io             live score sync (gratis, geen key)
+  - CartoDB dark tiles  kaart tiles
+  - Google Fonts        Bebas Neue + DM Mono
+-->
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Pub Golf">
+<meta name="theme-color" content="#FF6B00">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.json">
+<title>Pub Golf 🍺</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
+<style>
+:root {
+  --primary: #FF6B00;
+  --secondary: #FF1744;
+  --gold: #FFD600;
+  --dark: #0a0500;
+  --card: #160800;
+  --border: #3a1500;
+  --text: #ffe8d0;
+  --muted: #7a4020;
+  --green: #00C853;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+body { background: var(--dark); color: var(--text); font-family: 'DM Mono', monospace; min-height: 100vh; overflow-x: hidden; }
+.screen { display: none; min-height: 100vh; flex-direction: column; }
+.screen.active { display: flex; }
+
+/* ── INTRO ── */
+#screen-intro { align-items: center; justify-content: center; padding: 40px 24px; text-align: center; background: radial-gradient(ellipse at 50% 0%, #2e0f00 0%, var(--dark) 65%); }
+.logo { font-family: 'Bebas Neue', sans-serif; font-size: clamp(72px,20vw,110px); line-height: 0.9; letter-spacing: 2px; color: var(--primary); text-shadow: 0 0 60px rgba(255,107,0,0.4); margin-bottom: 8px; }
+.logo span { color: var(--secondary); }
+.tagline { font-size: 11px; letter-spacing: 4px; text-transform: uppercase; color: var(--muted); margin-bottom: 48px; }
+.group-select { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; width: 100%; max-width: 360px; margin-bottom: 32px; }
+.group-btn { padding: 28px 16px; border: 2px solid var(--border); border-radius: 12px; background: var(--card); color: var(--text); font-family: 'Bebas Neue', sans-serif; font-size: 32px; letter-spacing: 1px; cursor: pointer; transition: all 0.2s; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.group-btn .emoji { font-size: 36px; }
+.group-btn:active { transform: scale(0.96); }
+.group-btn.group-a { border-color: var(--primary); box-shadow: 0 0 24px rgba(255,107,0,0.2); }
+.group-btn.group-b { border-color: var(--secondary); box-shadow: 0 0 24px rgba(255,23,68,0.2); }
+.edit-link { background: none; border: none; color: var(--muted); font-family: 'DM Mono', monospace; font-size: 12px; cursor: pointer; text-decoration: underline; }
+
+/* ── GAME ── */
+#screen-game { padding: 0; overflow-y: auto; }
+.header { padding: 14px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; background: var(--dark); position: sticky; top: 0; z-index: 20; }
+.header-group { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 1px; }
+.header-group.a { color: var(--primary); }
+.header-group.b { color: var(--secondary); }
+.score-badge { font-size: 12px; color: var(--muted); }
+.score-badge span { color: var(--text); font-size: 15px; }
+.gps-pill { display: flex; align-items: center; gap: 6px; background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 5px 10px; font-size: 11px; color: var(--muted); }
+.gps-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+.gps-dot.active { background: var(--primary); animation: gpsPulse 1.5s infinite; }
+@keyframes gpsPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(255,107,0,0.5); } 50% { box-shadow: 0 0 0 5px rgba(255,107,0,0); } }
+
+.stop-card { margin: 16px 14px 0; background: var(--card); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; }
+.stop-card-header { padding: 12px 16px; background: #1a0800; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+.hole-label { font-size: 11px; letter-spacing: 3px; text-transform: uppercase; color: var(--muted); }
+.par-label { font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); }
+.par-label span { color: var(--primary); font-size: 15px; }
+.stop-card-body { padding: 16px; }
+.stop-name { font-family: 'Bebas Neue', sans-serif; font-size: 34px; letter-spacing: 1px; line-height: 1; margin-bottom: 3px; }
+.stop-address { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+
+/* travel time */
+.travel-time { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); margin-bottom: 14px; }
+.travel-time span { color: var(--text); }
+
+/* map */
+.map-wrap { border-radius: 10px; overflow: hidden; border: 1px solid var(--border); margin-bottom: 12px; }
+#stop-map { height: 260px; width: 100%; background: #110500; }
+.leaflet-popup-content-wrapper { background: #1a0800 !important; color: var(--text) !important; border: 1px solid var(--border) !important; border-radius: 8px !important; box-shadow: 0 4px 20px rgba(0,0,0,0.6) !important; font-family: 'DM Mono',monospace !important; font-size: 12px !important; }
+.leaflet-popup-tip { background: #1a0800 !important; }
+.leaflet-popup-close-button { color: var(--muted) !important; }
+.leaflet-control-zoom a { background: #1a0800 !important; color: var(--text) !important; border-color: var(--border) !important; }
+.leaflet-control-attribution { background: rgba(10,5,0,0.8) !important; color: var(--muted) !important; font-size: 9px !important; }
+.leaflet-control-attribution a { color: var(--muted) !important; }
+
+/* distance */
+.dist-row { display: flex; align-items: center; gap: 14px; padding: 14px; background: #0d0400; border-radius: 10px; margin-bottom: 12px; }
+.compass-circle { width: 52px; height: 52px; border-radius: 50%; border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; background: #111; transition: transform 0.5s ease; }
+.dist-num { font-family: 'Bebas Neue', sans-serif; font-size: 40px; line-height: 1; color: var(--muted); }
+.dist-num.close { color: var(--primary); }
+.dist-num.arrived { color: var(--green); }
+.dist-sub { font-size: 11px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; }
+
+/* clue */
+.clue-wrap { border-radius: 10px; overflow: hidden; border: 1px solid var(--border); margin-bottom: 12px; }
+.clue-locked-view { padding: 20px; text-align: center; background: #0d0400; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.clue-locked-view .lock { font-size: 26px; opacity: 0.35; }
+.clue-locked-view p { font-size: 12px; color: var(--muted); }
+.clue-locked-view.hidden { display: none; }
+.clue-open-view { display: none; padding: 18px; background: linear-gradient(135deg,#1f0800,#110500); }
+.clue-open-view.visible { display: block; }
+.clue-tag { font-size: 10px; letter-spacing: 4px; text-transform: uppercase; color: var(--primary); margin-bottom: 8px; }
+.clue-title-text { font-family: 'Bebas Neue', sans-serif; font-size: 26px; letter-spacing: 1px; color: var(--secondary); margin-bottom: 6px; }
+.clue-body { font-size: 13px; line-height: 1.7; color: #ddc0a0; }
+.clue-par-note { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); }
+.clue-par-note strong { color: var(--primary); }
+
+/* wildcard */
+.wildcard-banner { display: none; margin-bottom: 12px; padding: 14px 16px; border-radius: 10px; background: linear-gradient(135deg,#1a0f00,#0d0600); border: 1px solid var(--gold); }
+.wildcard-banner.visible { display: block; }
+.wildcard-tag { font-size: 10px; letter-spacing: 4px; text-transform: uppercase; color: var(--gold); margin-bottom: 6px; }
+.wildcard-text { font-size: 14px; color: var(--text); line-height: 1.5; }
+
+/* bonus hole */
+.bonus-badge { display: none; background: linear-gradient(135deg, var(--gold), #ff9800); color: #000; font-family: 'Bebas Neue', sans-serif; font-size: 13px; letter-spacing: 2px; padding: 5px 12px; border-radius: 20px; margin-bottom: 10px; }
+.bonus-badge.visible { display: inline-block; }
+
+/* photo */
+.photo-section { display: none; margin-bottom: 12px; }
+.photo-section.visible { display: block; }
+.btn-camera { width: 100%; padding: 15px; background: transparent; border: 2px dashed var(--primary); border-radius: 10px; color: var(--primary); font-family: 'Bebas Neue', sans-serif; font-size: 20px; letter-spacing: 2px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; }
+.btn-camera:active { background: #1f0800; }
+.photo-required-note { font-size: 11px; color: var(--secondary); text-align: center; margin-top: 6px; letter-spacing: 1px; }
+.photo-preview { margin-top: 10px; border-radius: 10px; overflow: hidden; display: none; }
+.photo-preview.has-photo { display: block; }
+.photo-preview img { width: 100%; display: block; border-radius: 10px; }
+.photo-preview-actions { display: flex; gap: 8px; margin-top: 8px; }
+.btn-retake { flex: 1; padding: 10px; background: transparent; border: 1px solid var(--border); border-radius: 8px; color: var(--muted); font-family: 'DM Mono', monospace; font-size: 12px; cursor: pointer; }
+.btn-download { flex: 1; padding: 10px; background: var(--primary); border: none; border-radius: 8px; color: #000; font-family: 'Bebas Neue', sans-serif; font-size: 14px; letter-spacing: 1px; cursor: pointer; }
+
+/* buttons */
+.btn-primary { width: 100%; padding: 15px; background: var(--primary); color: #000; border: none; border-radius: 10px; font-family: 'Bebas Neue', sans-serif; font-size: 20px; letter-spacing: 2px; cursor: pointer; transition: all 0.15s; margin-bottom: 10px; display: none; }
+.btn-primary.visible { display: block; }
+.btn-primary:active { background: #cc5500; transform: scale(0.98); }
+.btn-primary:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; }
+
+/* score */
+.score-area { display: none; background: #0d0400; border-radius: 10px; padding: 16px; border: 1px solid var(--border); margin-bottom: 10px; }
+.score-area.visible { display: block; }
+.score-area-label { font-size: 10px; letter-spacing: 3px; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; display: block; }
+.score-grid { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+.score-chip { flex: 1; min-width: 40px; padding: 11px 4px; border: 1px solid var(--border); border-radius: 8px; background: #160800; color: var(--muted); font-family: 'DM Mono', monospace; font-size: 14px; cursor: pointer; text-align: center; transition: all 0.15s; }
+.score-chip sub { font-size: 9px; display: block; opacity: 0.7; }
+.score-chip.selected { border-color: var(--primary); color: var(--primary); background: #2a0e00; }
+.score-chip:active { transform: scale(0.95); }
+.btn-confirm { width: 100%; padding: 13px; background: transparent; border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-family: 'Bebas Neue', sans-serif; font-size: 18px; letter-spacing: 2px; cursor: pointer; }
+.btn-confirm:active { border-color: var(--primary); color: var(--primary); }
+
+/* scorecard */
+.scorecard { margin: 14px 14px 24px; }
+.scorecard-title { font-size: 10px; letter-spacing: 4px; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; padding-left: 2px; }
+.sc-row { display: flex; align-items: center; gap: 10px; padding: 11px 12px; border-radius: 8px; margin-bottom: 5px; background: var(--card); border: 1px solid var(--border); }
+.sc-row.done { opacity: 0.4; }
+.sc-row.current { border-color: var(--primary); }
+.sc-row.upcoming { opacity: 0.55; }
+.sc-row.bonus-row { border-color: var(--gold); }
+.sc-num { width: 26px; height: 26px; border-radius: 50%; background: #1a0800; display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--muted); flex-shrink: 0; }
+.sc-row.done .sc-num { background: #1f0a00; color: var(--primary); }
+.sc-row.current .sc-num { background: var(--primary); color: #000; font-weight: bold; }
+.sc-row.bonus-row .sc-num { background: var(--gold); color: #000; }
+.sc-info { flex: 1; }
+.sc-name { font-size: 13px; }
+.sc-sub { font-size: 11px; color: var(--muted); margin-top: 1px; }
+.sc-score { font-family: 'Bebas Neue', sans-serif; font-size: 20px; color: var(--secondary); }
+
+/* ── BONUS UNLOCK SCREEN ── */
+#screen-bonus { align-items: center; justify-content: center; padding: 40px 24px; text-align: center; background: radial-gradient(ellipse at 50% 30%, #1a1000 0%, var(--dark) 65%); }
+.bonus-star { font-size: 72px; margin-bottom: 16px; animation: bonusPop 0.6s cubic-bezier(0.34,1.56,0.64,1); }
+@keyframes bonusPop { 0% { transform: scale(0); } 100% { transform: scale(1); } }
+.bonus-title { font-family: 'Bebas Neue', sans-serif; font-size: 52px; color: var(--gold); line-height: 1; margin-bottom: 8px; }
+.bonus-subtitle { font-size: 13px; color: var(--muted); margin-bottom: 28px; }
+.bonus-card { background: var(--card); border: 1px solid var(--gold); border-radius: 14px; padding: 24px; width: 100%; max-width: 340px; margin-bottom: 24px; }
+.bonus-card-tag { font-size: 10px; letter-spacing: 4px; text-transform: uppercase; color: var(--gold); margin-bottom: 10px; }
+.bonus-card-name { font-family: 'Bebas Neue', sans-serif; font-size: 30px; color: var(--text); margin-bottom: 6px; }
+.bonus-card-addr { font-size: 12px; color: var(--muted); margin-bottom: 14px; }
+.bonus-card-challenge { font-size: 13px; line-height: 1.7; color: #ddc0a0; }
+.btn-bonus-go { padding: 16px 40px; background: var(--gold); border: none; border-radius: 12px; color: #000; font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 2px; cursor: pointer; }
+.btn-bonus-skip { margin-top: 12px; background: none; border: 1px solid var(--border); border-radius: 10px; color: var(--muted); font-family: 'DM Mono', monospace; font-size: 12px; padding: 10px 24px; cursor: pointer; }
+
+/* ── FINISH ── */
+#screen-finish { align-items: center; justify-content: center; padding: 40px 24px; text-align: center; background: radial-gradient(ellipse at 50% 30%, #2e0800 0%, var(--dark) 65%); overflow-y: auto; }
+.trophy { font-size: 68px; margin-bottom: 14px; }
+.finish-title { font-family: 'Bebas Neue', sans-serif; font-size: 52px; color: var(--primary); line-height: 1; margin-bottom: 6px; }
+.finish-sub { font-size: 13px; color: var(--muted); margin-bottom: 28px; }
+.final-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 24px 28px; width: 100%; max-width: 320px; margin-bottom: 20px; }
+.final-label { font-size: 10px; letter-spacing: 4px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+.final-num { font-family: 'Bebas Neue', sans-serif; font-size: 72px; color: var(--primary); line-height: 1; }
+.final-rows { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); text-align: left; }
+.final-row { display: flex; justify-content: space-between; font-size: 11px; padding: 3px 0; color: var(--muted); }
+.final-row span:last-child { color: var(--text); }
+
+/* photo strip */
+.photo-strip-wrap { width: 100%; max-width: 360px; margin-bottom: 24px; }
+.photo-strip-title { font-size: 10px; letter-spacing: 4px; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; text-align: left; }
+.photo-strip { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px; scroll-snap-type: x mandatory; }
+.photo-strip::-webkit-scrollbar { height: 3px; }
+.photo-strip::-webkit-scrollbar-track { background: var(--card); }
+.photo-strip::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+.strip-frame { flex-shrink: 0; width: 140px; scroll-snap-align: start; background: #fff; padding: 6px 6px 24px; border-radius: 4px; box-shadow: 0 4px 16px rgba(0,0,0,0.5); }
+.strip-frame img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; }
+.strip-frame-label { font-family: 'DM Mono', monospace; font-size: 9px; color: #333; text-align: center; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.strip-dl { display: block; margin-top: 4px; text-align: center; font-size: 9px; color: var(--primary); cursor: pointer; background: none; border: none; width: 100%; font-family: 'DM Mono', monospace; }
+
+.btn-restart { padding: 14px 36px; background: transparent; border: 2px solid var(--border); border-radius: 10px; color: var(--muted); font-family: 'Bebas Neue', sans-serif; font-size: 18px; letter-spacing: 2px; cursor: pointer; }
+.btn-restart:active { border-color: var(--primary); color: var(--primary); }
+
+/* ── EDIT SCREEN ── */
+#screen-edit { overflow-y: auto; -webkit-overflow-scrolling: touch; flex: 1; }
+.edit-inner { padding: 20px 14px 40px; }
+.edit-title { font-family: 'Bebas Neue', sans-serif; font-size: 38px; letter-spacing: 1px; margin-bottom: 2px; }
+.edit-sub { font-size: 12px; color: var(--muted); margin-bottom: 20px; }
+
+/* wildcards editor */
+.wildcard-editor { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+.wildcard-editor-title { font-family: 'Bebas Neue', sans-serif; font-size: 22px; color: var(--gold); margin-bottom: 4px; }
+.wildcard-editor-sub { font-size: 11px; color: var(--muted); margin-bottom: 14px; }
+.wildcard-list { margin-bottom: 10px; }
+.wildcard-item { display: flex; gap: 8px; margin-bottom: 6px; align-items: center; }
+.wildcard-item input { flex: 1; background: #0d0400; border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-family: 'DM Mono', monospace; font-size: 13px; padding: 8px 10px; outline: none; }
+.wildcard-item input:focus { border-color: var(--gold); }
+.btn-wc-remove { background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--secondary); font-size: 14px; width: 32px; height: 32px; cursor: pointer; flex-shrink: 0; }
+.btn-wc-add { background: none; border: 1px dashed var(--border); border-radius: 8px; color: var(--muted); font-family: 'DM Mono', monospace; font-size: 12px; padding: 8px 14px; cursor: pointer; }
+
+/* bonus hole editor */
+.bonus-editor { background: var(--card); border: 1px solid var(--gold); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+.bonus-editor-title { font-family: 'Bebas Neue', sans-serif; font-size: 22px; color: var(--gold); margin-bottom: 4px; }
+.bonus-editor-sub { font-size: 11px; color: var(--muted); margin-bottom: 14px; }
+.bonus-enable-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.bonus-enable-label { font-size: 12px; color: var(--text); }
+.bonus-fields { display: none; }
+.bonus-fields.visible { display: block; }
+
+.tab-row { display: flex; gap: 8px; margin-bottom: 18px; }
+.tab-btn { flex: 1; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); color: var(--muted); font-family: 'DM Mono', monospace; font-size: 13px; cursor: pointer; text-align: center; transition: all 0.2s; }
+.tab-btn.sel-a { border-color: var(--primary); color: var(--primary); }
+.tab-btn.sel-b { border-color: var(--secondary); color: var(--secondary); }
+.tab-btn.sel-wc { border-color: var(--gold); color: var(--gold); }
+
+.stop-block { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-bottom: 10px; }
+.stop-block-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.stop-block-num { font-family: 'Bebas Neue', sans-serif; font-size: 18px; color: var(--muted); }
+.btn-remove { background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--secondary); font-size: 11px; padding: 4px 10px; cursor: pointer; font-family: 'DM Mono', monospace; }
+
+.field { margin-bottom: 10px; }
+.field label { display: block; font-size: 10px; letter-spacing: 3px; text-transform: uppercase; color: var(--muted); margin-bottom: 5px; }
+.field input, .field textarea { width: 100%; background: #0d0400; border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-family: 'DM Mono', monospace; font-size: 13px; padding: 10px 12px; outline: none; transition: border-color 0.2s; -webkit-appearance: none; }
+.field input:focus, .field textarea:focus { border-color: var(--primary); }
+.field textarea { resize: vertical; min-height: 75px; }
+.coords-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+.photo-toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: #0d0400; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 10px; }
+.photo-toggle-label { font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); }
+.toggle-switch { position: relative; width: 42px; height: 24px; }
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-track { position: absolute; inset: 0; background: var(--border); border-radius: 24px; cursor: pointer; transition: background 0.2s; }
+.toggle-track:before { content: ''; position: absolute; width: 18px; height: 18px; left: 3px; top: 3px; background: var(--muted); border-radius: 50%; transition: all 0.2s; }
+.toggle-switch input:checked + .toggle-track { background: var(--primary); }
+.toggle-switch input:checked + .toggle-track:before { transform: translateX(18px); background: #000; }
+
+.wildcard-toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: #0d0400; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 10px; }
+.wildcard-toggle-label { font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); }
+
+.stop-fields-grid { display: grid; grid-template-columns: 1fr; gap: 0; }
+
+.btn-add-stop { width: 100%; padding: 13px; background: transparent; border: 1px dashed var(--border); border-radius: 10px; color: var(--muted); font-family: 'DM Mono', monospace; font-size: 13px; cursor: pointer; margin-bottom: 16px; }
+.btn-save { width: 100%; padding: 15px; background: var(--primary); border: none; border-radius: 10px; color: #000; font-family: 'Bebas Neue', sans-serif; font-size: 20px; letter-spacing: 2px; cursor: pointer; margin-bottom: 10px; }
+.btn-save:active { background: #cc5500; }
+.btn-back { width: 100%; padding: 13px; background: transparent; border: 1px solid var(--border); border-radius: 10px; color: var(--muted); font-family: 'Bebas Neue', sans-serif; font-size: 16px; letter-spacing: 2px; cursor: pointer; }
+
+/* hidden */
+#camera-input { display: none; }
+
+/* toast */
+.toast { position: fixed; top: -80px; left: 14px; right: 14px; background: var(--primary); color: #000; padding: 14px 18px; border-radius: 10px; font-family: 'Bebas Neue', sans-serif; font-size: 17px; letter-spacing: 1px; z-index: 200; transition: top 0.4s cubic-bezier(0.34,1.56,0.64,1); text-align: center; pointer-events: none; }
+.toast.show { top: 14px; }
+
+/* ── CLUE REVEAL ANIMATION ── */
+@keyframes revealDrop {
+  0%   { opacity:0; transform: translateY(-18px) scale(0.95); }
+  60%  { transform: translateY(4px) scale(1.02); }
+  100% { opacity:1; transform: translateY(0) scale(1); }
+}
+@keyframes lockShake {
+  0%,100% { transform: translateX(0); }
+  20%     { transform: translateX(-8px) rotate(-4deg); }
+  40%     { transform: translateX(8px)  rotate(4deg); }
+  60%     { transform: translateX(-5px); }
+  80%     { transform: translateX(5px); }
+}
+@keyframes flashScreen {
+  0%   { opacity: 0; }
+  30%  { opacity: 0.35; }
+  100% { opacity: 0; }
+}
+.clue-open-view.animate { animation: revealDrop 0.5s cubic-bezier(0.34,1.3,0.64,1) both; }
+.clue-locked-view.shake  { animation: lockShake 0.5s ease; }
+.arrival-flash { position:fixed; inset:0; background:var(--primary); pointer-events:none; z-index:300; opacity:0; }
+.arrival-flash.go { animation: flashScreen 0.6s ease forwards; }
+
+/* ── LIVE SCORE ── */
+.live-score-bar {
+  display: none;
+  margin: 10px 14px 0;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.live-score-bar.visible { display: flex; align-items: center; gap: 10px; }
+.live-score-label { font-size: 10px; letter-spacing: 3px; text-transform: uppercase; color: var(--muted); flex-shrink: 0; }
+.live-score-teams { display: flex; gap: 10px; flex: 1; }
+.live-score-team { flex: 1; background: #0d0400; border-radius: 8px; padding: 8px 10px; text-align: center; border: 1px solid var(--border); }
+.live-score-team.winning { border-color: var(--gold); }
+.live-score-team-name { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 2px; }
+.live-score-team-name.a { color: var(--primary); }
+.live-score-team-name.b { color: var(--secondary); }
+.live-score-team-num { font-family: 'Bebas Neue', sans-serif; font-size: 28px; line-height: 1; }
+.live-score-team-hole { font-size: 10px; color: var(--muted); margin-top: 1px; }
+.live-sync-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
+.live-sync-dot.synced { background: var(--green); animation: gpsPulse 2s infinite; }
+
+/* ── SESSION CODE screen ── */
+#screen-session { align-items: center; justify-content: center; padding: 40px 24px; text-align: center; background: radial-gradient(ellipse at 50% 0%, #2e0f00 0%, var(--dark) 65%); }
+.session-title { font-family: 'Bebas Neue', sans-serif; font-size: 44px; color: var(--primary); margin-bottom: 6px; }
+.session-sub { font-size: 12px; color: var(--muted); margin-bottom: 32px; line-height: 1.6; }
+.session-code-display { font-family: 'Bebas Neue', sans-serif; font-size: 64px; letter-spacing: 12px; color: var(--text); background: var(--card); border: 2px solid var(--border); border-radius: 16px; padding: 20px 32px; margin-bottom: 8px; }
+.session-code-note { font-size: 11px; color: var(--muted); margin-bottom: 28px; }
+.session-or { font-size: 12px; color: var(--muted); margin: 20px 0 16px; letter-spacing: 2px; }
+.session-join-row { display: flex; gap: 10px; width: 100%; max-width: 320px; margin-bottom: 28px; }
+.session-join-input { flex: 1; background: var(--card); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font-family: 'Bebas Neue', sans-serif; font-size: 28px; letter-spacing: 6px; padding: 12px 16px; outline: none; text-align: center; text-transform: uppercase; }
+.session-join-input:focus { border-color: var(--primary); }
+.btn-session-join { padding: 12px 20px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font-family: 'Bebas Neue', sans-serif; font-size: 18px; cursor: pointer; white-space: nowrap; }
+.btn-session-join:active { border-color: var(--primary); }
+.btn-session-skip { background: none; border: none; color: var(--muted); font-family: 'DM Mono', monospace; font-size: 12px; cursor: pointer; text-decoration: underline; }
+@media (min-width: 900px) {
+  .edit-inner { max-width: 1300px; margin: 0 auto; padding: 40px 40px 60px; }
+  .edit-title { font-size: 52px; }
+  .tab-row { display: none; }
+  #editor-a, #editor-b { display: block !important; }
+  #panel-a, #panel-b { display: block !important; }
+  .desktop-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: start; }
+  .desktop-col-header { font-family: 'Bebas Neue', sans-serif; font-size: 26px; letter-spacing: 2px; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 2px solid var(--border); }
+  .desktop-col-header.col-a { color: var(--primary); border-color: var(--primary); }
+  .desktop-col-header.col-b { color: var(--secondary); border-color: var(--secondary); }
+  .stop-fields-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .stop-fields-grid .field { margin-bottom: 0; }
+  .stop-fields-grid .field.full { grid-column: 1 / -1; }
+  .stop-fields-grid .field textarea { min-height: 60px; }
+  .desktop-actions { display: flex; gap: 12px; margin-top: 32px; }
+  .btn-save { width: auto; padding: 14px 40px; margin-bottom: 0; }
+  .btn-back { width: auto; padding: 14px 28px; }
+  .btn-add-stop-col { width: 100%; padding: 12px; background: transparent; border: 1px dashed var(--border); border-radius: 10px; color: var(--muted); font-family: 'DM Mono', monospace; font-size: 13px; cursor: pointer; margin-top: 4px; }
+  .btn-add-stop-col:hover { border-color: var(--primary); color: var(--primary); }
+  .mobile-only { display: none; }
+}
+@media (max-width: 899px) { .desktop-only { display: none; } }
+</style>
+</head>
+<body>
+
+<input type="file" id="camera-input" accept="image/*" capture="environment">
+<div class="toast" id="toast"></div>
+<div class="arrival-flash" id="arrival-flash"></div>
+
+<!-- SESSION CODE -->
+<div class="screen" id="screen-session">
+  <div class="session-title">Live Score</div>
+  <div class="session-sub">Deel deze code met de andere groep<br>zodat jullie elkaars score live zien.</div>
+  <div class="session-code-display" id="session-code-display">—</div>
+  <div class="session-code-note">Jouw sessiecode · stuur via WhatsApp</div>
+  <div class="session-or">— of join een bestaande sessie —</div>
+  <div class="session-join-row">
+    <input class="session-join-input" id="session-join-input" maxlength="4" placeholder="XXXX" oninput="this.value=this.value.toUpperCase()">
+    <button class="btn-session-join" onclick="joinSession()">Join</button>
+  </div>
+  <button class="btn-session-skip" onclick="skipSession()">Overslaan, alleen spelen</button>
+</div>
+
+<!-- INTRO -->
+<div class="screen active" id="screen-intro">
+  <div class="logo">PUB<br><span>GOLF</span></div>
+  <div class="tagline">May the best group win</div>
+  <div class="group-select">
+    <button class="group-btn group-a" onclick="selectGroup('A')"><span class="emoji">🔥</span>GROUP<br>A</button>
+    <button class="group-btn group-b" onclick="selectGroup('B')"><span class="emoji">💀</span>GROUP<br>B</button>
+  </div>
+  <button class="edit-link" onclick="openEditor()">⚙️ Edit stops &amp; clues</button>
+</div>
+
+<!-- EDIT -->
+<div class="screen" id="screen-edit">
+  <div class="edit-inner">
+    <div class="edit-title">Edit Course</div>
+    <div class="edit-sub">Configureer stops, wildcards en de geheime bonus hole.</div>
+
+    <!-- MOBILE tabs -->
+    <div class="tab-row">
+      <div class="tab-btn sel-a" id="tab-a" onclick="switchTab('A')">🔥 Group A</div>
+      <div class="tab-btn" id="tab-b" onclick="switchTab('B')">💀 Group B</div>
+      <div class="tab-btn" id="tab-wc" onclick="switchTab('WC')">🃏 Extras</div>
+    </div>
+
+    <!-- MOBILE single column -->
+    <div class="mobile-only">
+      <div id="panel-a"><div id="editor-a"></div><button class="btn-add-stop" onclick="addStop('A')">+ Stop toevoegen</button></div>
+      <div id="panel-b" style="display:none"><div id="editor-b"></div><button class="btn-add-stop" onclick="addStop('B')">+ Stop toevoegen</button></div>
+      <div id="panel-wc" style="display:none">
+        <div id="wildcard-editor-mobile"></div>
+        <div id="bonus-editor-mobile"></div>
+      </div>
+      <button class="btn-save" onclick="saveRoute()">✓ Opslaan</button>
+      <button class="btn-back" onclick="goHome()">← Terug zonder opslaan</button>
+    </div>
+
+    <!-- DESKTOP two columns -->
+    <div class="desktop-only">
+      <div class="desktop-columns">
+        <div>
+          <div class="desktop-col-header col-a">🔥 Group A</div>
+          <div id="editor-a"></div>
+          <button class="btn-add-stop-col" onclick="addStop('A')">+ Stop toevoegen aan Group A</button>
+        </div>
+        <div>
+          <div class="desktop-col-header col-b">💀 Group B</div>
+          <div id="editor-b"></div>
+          <button class="btn-add-stop-col" onclick="addStop('B')">+ Stop toevoegen aan Group B</button>
+        </div>
+      </div>
+      <div style="margin-top:28px; display:grid; grid-template-columns:1fr 1fr; gap:28px;">
+        <div id="wildcard-editor-desktop"></div>
+        <div id="bonus-editor-desktop"></div>
+      </div>
+      <div class="desktop-actions">
+        <button class="btn-save" onclick="saveRoute()">✓ Opslaan</button>
+        <button class="btn-back" onclick="goHome()">← Terug zonder opslaan</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- GAME -->
+<div class="screen" id="screen-game">
+  <div class="header">
+    <div>
+      <div class="header-group a" id="hdr-group">GROUP A</div>
+      <div class="score-badge">Strokes: <span id="hdr-score">0</span></div>
+    </div>
+    <div class="gps-pill">
+      <div class="gps-dot" id="gps-dot"></div>
+      <span id="gps-txt">searching</span>
+    </div>
+  </div>
+
+  <div class="live-score-bar" id="live-score-bar">
+    <div class="live-score-label">Live</div>
+    <div class="live-score-teams">
+      <div class="live-score-team" id="ls-team-a">
+        <div class="live-score-team-name a">Group A</div>
+        <div class="live-score-team-num" id="ls-score-a">—</div>
+        <div class="live-score-team-hole" id="ls-hole-a">hole —</div>
+      </div>
+      <div class="live-score-team" id="ls-team-b">
+        <div class="live-score-team-name b">Group B</div>
+        <div class="live-score-team-num" id="ls-score-b">—</div>
+        <div class="live-score-team-hole" id="ls-hole-b">hole —</div>
+      </div>
+    </div>
+    <div class="live-sync-dot" id="live-sync-dot"></div>
+  </div>
+
+  <div class="stop-card">
+    <div class="stop-card-header">
+      <div class="hole-label" id="hole-label">HOLE 1 / 8</div>
+      <div class="par-label">PAR <span id="par-val">—</span></div>
+    </div>
+    <div class="stop-card-body">
+      <div class="bonus-badge" id="bonus-badge">⭐ BONUS HOLE</div>
+      <div class="stop-name" id="stop-name">—</div>
+      <div class="stop-address" id="stop-addr">—</div>
+      <div class="travel-time" id="travel-time" style="display:none">🚶 <span id="travel-time-val">—</span></div>
+
+      <div class="map-wrap"><div id="stop-map"></div></div>
+
+      <div class="dist-row">
+        <div class="compass-circle" id="compass">🧭</div>
+        <div>
+          <div class="dist-num" id="dist-num">—</div>
+          <div class="dist-sub" id="dist-sub">searching gps…</div>
+        </div>
+      </div>
+
+      <div class="wildcard-banner" id="wildcard-banner">
+        <div class="wildcard-tag">🃏 Wildcard</div>
+        <div class="wildcard-text" id="wildcard-text">—</div>
+      </div>
+
+      <div class="clue-wrap">
+        <div class="clue-locked-view" id="clue-locked">
+          <div class="lock">🔒</div>
+          <p>Clue unlocks when you arrive</p>
+        </div>
+        <div class="clue-open-view" id="clue-open">
+          <div class="clue-tag">🎯 Your Challenge</div>
+          <div class="clue-title-text" id="clue-title">—</div>
+          <div class="clue-body" id="clue-body">—</div>
+          <div class="clue-par-note">Par: <strong id="clue-par">—</strong> strokes</div>
+        </div>
+      </div>
+
+      <div class="photo-section" id="photo-section">
+        <button class="btn-camera" onclick="openCamera()">📸 Groepsfoto maken</button>
+        <div class="photo-required-note" id="photo-required-note" style="display:none">⚠️ Foto verplicht voor je verder kunt</div>
+        <div class="photo-preview" id="photo-preview">
+          <img id="photo-img" src="" alt="foto">
+          <div class="photo-preview-actions">
+            <button class="btn-retake" onclick="openCamera()">↺ Opnieuw</button>
+            <button class="btn-download" onclick="downloadCurrentPhoto()">⬇ Opslaan</button>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn-primary" id="btn-log" onclick="showScoreArea()">✓ Strokes invullen</button>
+
+      <div class="score-area" id="score-area">
+        <span class="score-area-label">Hoeveel drankjes?</span>
+        <div class="score-grid" id="score-grid"></div>
+        <button class="btn-confirm" onclick="confirmScore()">Bevestigen &amp; volgende hole →</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="scorecard">
+    <div class="scorecard-title">Scorecard</div>
+    <div id="sc-rows"></div>
+  </div>
+</div>
+
+<!-- BONUS UNLOCK -->
+<div class="screen" id="screen-bonus">
+  <div class="bonus-star">⭐</div>
+  <div class="bonus-title">Bonus Hole!</div>
+  <div class="bonus-subtitle">Jullie hebben een geheime stop ontgrendeld</div>
+  <div class="bonus-card">
+    <div class="bonus-card-tag">📍 Geheime locatie</div>
+    <div class="bonus-card-name" id="bonus-hole-name">—</div>
+    <div class="bonus-card-addr" id="bonus-hole-addr">—</div>
+    <div class="bonus-card-challenge" id="bonus-hole-challenge">—</div>
+  </div>
+  <button class="btn-bonus-go" onclick="acceptBonus()">🔥 We gaan!</button>
+  <br>
+  <button class="btn-bonus-skip" onclick="skipBonus()">Sla over</button>
+</div>
+
+<!-- FINISH -->
+<div class="screen" id="screen-finish">
+  <div class="trophy">🏆</div>
+  <div class="finish-title">Klaar!</div>
+  <div class="finish-sub" id="finish-sub">—</div>
+  <div class="final-card">
+    <div class="final-label">Totaal strokes</div>
+    <div class="final-num" id="final-num">0</div>
+    <div class="final-rows" id="final-rows"></div>
+  </div>
+  <div class="photo-strip-wrap" id="photo-strip-wrap" style="display:none">
+    <div class="photo-strip-title">📸 Fotostrip</div>
+    <div class="photo-strip" id="photo-strip"></div>
+  </div>
+  <button class="btn-restart" onclick="restart()">Opnieuw spelen</button>
+</div>
+
+<script>
+// ── DEFAULT DATA ──────────────────────────────
+var DEFAULTS = {
+  A: [
+    { name:"The Starting Tap",    address:"Leidseplein 12",           lat:52.3641, lng:4.8833, par:3, clueTitle:"Mime Bartender",        challenge:"Bestel alleen met handgebaren. Geen woorden!", photo:false, wildcard:false },
+    { name:"The Wobbly Windmill", address:"Rembrandtplein 5",         lat:52.3663, lng:4.8966, par:2, clueTitle:"Southpaw Challenge",    challenge:"Drink je drankje alleen met je niet-dominante hand.", photo:false, wildcard:true },
+    { name:"Canal House Bar",     address:"Herengracht 90",           lat:52.3738, lng:4.8877, par:4, clueTitle:"Compliment Machine",    challenge:"Elk slokje begint met een compliment aan een vreemde.", photo:false, wildcard:false },
+    { name:"The Red Tulip",       address:"Jordaan, Westerstraat 22", lat:52.3771, lng:4.8836, par:2, clueTitle:"Race the Playlist",     challenge:"Finish je drankje voor het volgende nummer afloopt.", photo:true,  wildcard:false },
+    { name:"Brew Corner",         address:"Nieuwmarkt 18",            lat:52.3726, lng:4.9003, par:3, clueTitle:"Sip & Sit",             challenge:"Je moet gaan zitten bij elke slok.", photo:false, wildcard:true },
+    { name:"The Dark Horse",      address:"Spuistraat 250",           lat:52.3721, lng:4.8885, par:2, clueTitle:"Bartender's Choice",    challenge:"Laat de barman een drankje kiezen. Drinken wat je krijgt.", photo:false, wildcard:false },
+    { name:"Final Hole Pub",      address:"Vijzelstraat 45",          lat:52.3602, lng:4.8950, par:1, clueTitle:"The Grand Finale",      challenge:"Leegdrinken in één keer. Geen pauze, geen handen.", photo:true,  wildcard:false },
+    { name:"Victory Lap",         address:"Vondelpark Cafe",          lat:52.3580, lng:4.8711, par:3, clueTitle:"Buy the Round",         challenge:"Bestel een rondje voor iedereen. Jij bent de held.", photo:false, wildcard:false }
+  ],
+  B: [
+    { name:"The First Sip",       address:"Damrak 64",                lat:52.3737, lng:4.8952, par:3, clueTitle:"Laugh Tracker",         challenge:"Elke keer als iemand in de bar lacht, neem je een slok.", photo:false, wildcard:true },
+    { name:"Brouwerij Noord",     address:"Prinsengracht 438",        lat:52.3688, lng:4.8815, par:2, clueTitle:"Pinky Power",           challenge:"Drink alleen met je beide pinkvingers.", photo:false, wildcard:false },
+    { name:"The Iron Pint",       address:"Utrechtsestraat 33",       lat:52.3607, lng:4.9005, par:4, clueTitle:"Networking Hour",       challenge:"Voer een volledig gesprek met een vreemde voor je klaar bent.", photo:true,  wildcard:false },
+    { name:"Cafe De Gaper",       address:"Spuistraat 30",            lat:52.3734, lng:4.8903, par:2, clueTitle:"The Staredown",         challenge:"Drink terwijl je oogcontact houdt met een teamlid.", photo:false, wildcard:true },
+    { name:"Waterhole Bar",       address:"Korte Leidsedwarsstraat",  lat:52.3626, lng:4.8808, par:3, clueTitle:"International Drinker", challenge:"Elke slok moet gepaard gaan met een ander accent.", photo:false, wildcard:false },
+    { name:"Bitterzoet",          address:"Spuistraat 2",             lat:52.3745, lng:4.8907, par:2, clueTitle:"Count Your Crowd",      challenge:"Drink alleen als er een oneven aantal mensen binnen 5 meter zijn.", photo:false, wildcard:false },
+    { name:"The Tasting Room",    address:"Nes 37",                   lat:52.3712, lng:4.8969, par:1, clueTitle:"Drink Storyteller",     challenge:"Verzin een naam en verhaal voor je drankje. Vertel het aan de groep.", photo:true,  wildcard:false },
+    { name:"Club House",          address:"Amstel 54",                lat:52.3656, lng:4.9010, par:3, clueTitle:"Victory Dance",         challenge:"Doe een overwinningsdans na het drinken. De groep geeft een cijfer.", photo:false, wildcard:true }
+  ],
+  wildcards: [
+    "Drink je glas omhoog houdend met gestrekte arm",
+    "Wissel glas met de persoon naast je",
+    "Drink op je knieën",
+    "Elke slok moet je eerst een grapje vertellen",
+    "Finish in stille modus — niemand mag praten",
+    "Drink met je ogen dicht"
+  ],
+  bonus: {
+    enabled: true,
+    triggerAfterHole: 4,
+    name: "The Secret Vault",
+    address: "Amstelstraat 24",
+    lat: 52.3671,
+    lng: 4.9003,
+    par: 2,
+    challenge: "Iedereen bestelt hetzelfde drankje als de eerste persoon die binnenkomt na jullie. Geen uitzonderingen."
+  }
+};
+
+// ── STATE ─────────────────────────────────────
+var course = JSON.parse(localStorage.getItem('pg_course') || 'null') || clone(DEFAULTS);
+var group = 'A';
+var stopIdx = 0;
+var scores = [];
+var photos = {};
+var pickedScore = null;
+var watchId = null;
+var arrived = false;
+var editTab = 'A';
+var bonusInserted = false;
+var bonusPending = false;
+var map = null, playerMarker = null, destMarker = null, routeLine = null;
+var lastPos = null;
+
+// session
+var sessionCode = null;
+var sessionPeer = null; // other group's code key
+var syncInterval = null;
+var audioCtx = null;
+var lastRouteFetchPos = null; // throttle OSRM requests
+
+function clone(o) { return JSON.parse(JSON.stringify(o)); }
+
+// ── NAVIGATION ────────────────────────────────
+function show(id) {
+  document.querySelectorAll('.screen').forEach(function(s) { s.classList.remove('active'); });
+  document.getElementById(id).classList.add('active');
+}
+function goHome() { show('screen-intro'); }
+
+// ── GAME ─────────────────────────────────────
+function selectGroup(g) {
+  group = g;
+  stopIdx = 0;
+  scores = [];
+  photos = {};
+  pickedScore = null;
+  arrived = false;
+  bonusInserted = false;
+  bonusPending = false;
+
+  // generate a session code and show the sharing screen
+  sessionCode = randomCode();
+  document.getElementById('session-code-display').textContent = sessionCode;
+  document.getElementById('session-join-input').value = '';
+  show('screen-session');
+}
+
+function getStops() { return course[group]; }
+
+function renderStop() {
+  var stops = getStops();
+  var s = stops[stopIdx];
+  document.getElementById('hole-label').textContent = 'HOLE ' + (stopIdx+1) + ' / ' + stops.length;
+  document.getElementById('par-val').textContent = s.par;
+  document.getElementById('stop-name').textContent = s.name;
+  document.getElementById('stop-addr').textContent = s.address;
+  document.getElementById('hdr-score').textContent = scores.reduce(function(a,b){return a+b;},0);
+
+  // bonus badge
+  var bb = document.getElementById('bonus-badge');
+  if (s._bonus) bb.classList.add('visible'); else bb.classList.remove('visible');
+
+  // travel time (reset — will update on GPS)
+  var tt = document.getElementById('travel-time');
+  tt.style.display = 'none';
+
+  // wildcard: show before arrival
+  var wc = document.getElementById('wildcard-banner');
+  if (s.wildcard && course.wildcards && course.wildcards.length > 0) {
+    var wcText = course.wildcards[Math.floor(Math.random() * course.wildcards.length)];
+    document.getElementById('wildcard-text').textContent = wcText;
+    wc.classList.add('visible');
+  } else {
+    wc.classList.remove('visible');
+  }
+
+  // reset
+  document.getElementById('dist-num').textContent = '—';
+  document.getElementById('dist-num').className = 'dist-num';
+  document.getElementById('dist-sub').textContent = 'searching gps…';
+  document.getElementById('compass').textContent = '🧭';
+  document.getElementById('compass').style.transform = '';
+  document.getElementById('clue-locked').classList.remove('hidden');
+  document.getElementById('clue-open').classList.remove('visible');
+  document.getElementById('btn-log').classList.remove('visible');
+  document.getElementById('score-area').classList.remove('visible');
+  document.getElementById('photo-section').classList.remove('visible');
+  document.getElementById('photo-preview').classList.remove('has-photo');
+  document.getElementById('photo-img').src = '';
+  document.getElementById('photo-required-note').style.display = 'none';
+
+  arrived = false;
+  pickedScore = null;
+  lastRouteFetchPos = null;
+  setTimeout(function() { initMap(s); }, 80);
+}
+
+function renderScorecard() {
+  var stops = getStops();
+  var box = document.getElementById('sc-rows');
+  box.innerHTML = '';
+  stops.forEach(function(s, i) {
+    var row = document.createElement('div');
+    var cls = i < stopIdx ? 'done' : i === stopIdx ? 'current' : 'upcoming';
+    if (s._bonus) cls += ' bonus-row';
+    row.className = 'sc-row ' + cls;
+    var sc = scores[i] !== undefined ? scores[i] : '—';
+    var diff = '';
+    if (scores[i] !== undefined) {
+      var d = scores[i] - s.par;
+      diff = d > 0 ? '+'+d : d === 0 ? 'par' : String(d);
+    }
+    var icon = i < stopIdx ? '✓' : s._bonus ? '⭐' : String(i+1);
+    row.innerHTML =
+      '<div class="sc-num">' + icon + '</div>' +
+      '<div class="sc-info"><div class="sc-name">' + s.name + '</div>' +
+      '<div class="sc-sub">Par ' + s.par + (diff ? ' · '+diff : '') + (s._bonus ? ' · bonus' : '') + '</div></div>' +
+      '<div class="sc-score">' + sc + '</div>';
+    box.appendChild(row);
+  });
+}
+
+// ── MAP ───────────────────────────────────────
+function initMap(stop) {
+  if (map) { map.remove(); map = null; playerMarker = null; destMarker = null; routeLine = null; peerMarker = null; }
+  map = L.map('stop-map', { zoomControl: false, scrollWheelZoom: false, dragging: true, attributionControl: true })
+         .setView([stop.lat, stop.lng], 17);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution:'© OpenStreetMap © CARTO', subdomains:'abcd', maxZoom:19 }).addTo(map);
+  var destIcon = L.divIcon({
+    html: '<div style="background:' + (stop._bonus ? '#FFD600' : '#FF6B00') + ';width:34px;height:34px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:3px solid #000;box-shadow:0 2px 10px rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;"><span style="transform:rotate(45deg);font-size:15px;display:block;">' + (stop._bonus ? '⭐' : '🍺') + '</span></div>',
+    iconSize:[34,34], iconAnchor:[17,34], className:''
+  });
+  destMarker = L.marker([stop.lat, stop.lng], { icon: destIcon }).addTo(map).bindPopup('<strong>' + stop.name + '</strong><br>' + stop.address);
+  setTimeout(function() { if (map) map.invalidateSize(); }, 120);
+}
+
+function updateMapPlayer(lat, lng, dlat, dlng, heading) {
+  if (!map) return;
+
+  // Arrow icon that rotates with heading
+  var deg = (heading != null && !isNaN(heading)) ? heading : 0;
+  var playerIcon = L.divIcon({
+    html: '<div style="position:relative;width:28px;height:28px;">' +
+            '<div style="position:absolute;inset:0;background:#FF6B00;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 4px rgba(255,107,0,0.35);"></div>' +
+            '<div style="position:absolute;left:50%;top:2px;transform:translateX(-50%) rotate(' + deg + 'deg);transform-origin:50% 10px;width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:10px solid #fff;"></div>' +
+          '</div>',
+    iconSize:[28,28], iconAnchor:[14,14], className:''
+  });
+
+  if (playerMarker) { playerMarker.setLatLng([lat, lng]); playerMarker.setIcon(playerIcon); }
+  else playerMarker = L.marker([lat, lng], { icon: playerIcon, zIndexOffset: 1000 }).addTo(map);
+
+  // Smooth follow: keep player centred
+  map.setView([lat, lng], 17, { animate: true, duration: 0.6 });
+
+  // Fetch route only every 15m
+  if (lastRouteFetchPos && haversine(lat, lng, lastRouteFetchPos[0], lastRouteFetchPos[1]) < 15) return;
+  lastRouteFetchPos = [lat, lng];
+  fetchRoute(lat, lng, dlat, dlng);
+}
+
+function fetchRoute(lat, lng, dlat, dlng) {
+  var url = 'https://router.project-osrm.org/route/v1/foot/' +
+    lng + ',' + lat + ';' + dlng + ',' + dlat +
+    '?overview=full&geometries=geojson';
+  fetch(url)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!map) return;
+      if (routeLine) map.removeLayer(routeLine);
+      if (data.routes && data.routes[0]) {
+        var coords = data.routes[0].geometry.coordinates.map(function(c) { return [c[1], c[0]]; });
+        routeLine = L.polyline(coords, { color:'#FF6B00', weight:5, opacity:0.85, lineJoin:'round', lineCap:'round' }).addTo(map);
+        updateTravelTime(data.routes[0].distance);
+      } else {
+        routeLine = L.polyline([[lat,lng],[dlat,dlng]], { color:'#FF6B00', weight:3, dashArray:'6 8', opacity:0.6 }).addTo(map);
+      }
+    })
+    .catch(function() {
+      if (!map) return;
+      if (routeLine) map.removeLayer(routeLine);
+      routeLine = L.polyline([[lat,lng],[dlat,dlng]], { color:'#FF6B00', weight:3, dashArray:'6 8', opacity:0.6 }).addTo(map);
+    });
+}
+
+// ── GPS ───────────────────────────────────────
+function startGPS() {
+  if (!navigator.geolocation) { document.getElementById('gps-txt').textContent = 'unavailable'; return; }
+  watchId = navigator.geolocation.watchPosition(
+    function(pos) {
+      lastPos = pos;
+      document.getElementById('gps-dot').classList.add('active');
+      document.getElementById('gps-txt').textContent = 'active';
+      onPosition(pos);
+    },
+    function() { document.getElementById('gps-txt').textContent = 'error'; },
+    { enableHighAccuracy:true, maximumAge:5000, timeout:15000 }
+  );
+}
+function stopGPS() { if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; } }
+
+function onPosition(pos) {
+  var stops = getStops();
+  if (stopIdx >= stops.length) return;
+  var s = stops[stopIdx];
+  var dist = haversine(pos.coords.latitude, pos.coords.longitude, s.lat, s.lng);
+  var bear = bearing(pos.coords.latitude, pos.coords.longitude, s.lat, s.lng);
+  updateDist(dist, bear);
+  updateTravelTime(dist);
+  var heading = pos.coords.heading; // degrees from north, null if stationary
+  updateMapPlayer(pos.coords.latitude, pos.coords.longitude, s.lat, s.lng, heading);
+  pushLocation(pos.coords.latitude, pos.coords.longitude);
+  if (!arrived && dist < 80) { arrived = true; unlockClue(s); }
+}
+
+function updateDist(dist, bear) {
+  var el = document.getElementById('dist-num');
+  var sub = document.getElementById('dist-sub');
+  var comp = document.getElementById('compass');
+  if (dist < 80) {
+    el.textContent = 'HIER'; el.className = 'dist-num arrived';
+    sub.textContent = "je bent er!";
+    comp.textContent = '✅'; comp.style.transform = '';
+  } else if (dist < 500) {
+    el.textContent = Math.round(dist)+'m'; el.className = 'dist-num close';
+    sub.textContent = 'bijna er';
+    comp.textContent = '➤'; comp.style.transform = 'rotate('+bear+'deg)';
+  } else {
+    el.textContent = (dist/1000).toFixed(1)+' km'; el.className = 'dist-num';
+    sub.textContent = 'blijf lopen';
+    comp.textContent = '➤'; comp.style.transform = 'rotate('+bear+'deg)';
+  }
+}
+
+function updateTravelTime(dist) {
+  // avg walking speed 5km/h = 83m/min
+  var mins = Math.round(dist / 83);
+  var tt = document.getElementById('travel-time');
+  var ttv = document.getElementById('travel-time-val');
+  if (dist > 80) {
+    tt.style.display = 'inline-flex';
+    ttv.textContent = mins <= 1 ? '~1 min lopen' : '~' + mins + ' min lopen';
+  } else {
+    tt.style.display = 'none';
+  }
+}
+
+function startGame() {
+  var hdr = document.getElementById('hdr-group');
+  hdr.textContent = 'GROUP ' + group;
+  hdr.className = 'header-group ' + group.toLowerCase();
+  renderStop();
+  renderScorecard();
+  show('screen-game');
+  startGPS();
+  if (sessionCode) startSync();
+}
+
+// ── SESSION / LIVE SCORE + LOCATION (Firebase Realtime Database) ──────────────────────
+// Vul hier je eigen Firebase project config in (zie README voor instructies).
+var FIREBASE_CONFIG = {
+  apiKey: "YOUR_API_KEY",
+  databaseURL: "https://YOUR_PROJECT-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "YOUR_PROJECT"
+};
+
+var fbApp = null, fbDb = null;
+var playerId = null;
+var peerMarker = null;
+var myRef = null, peerRef = null;
+
+function getFirebase() {
+  if (fbDb) return fbDb;
+  try {
+    fbApp = firebase.initializeApp(FIREBASE_CONFIG);
+    fbDb = firebase.database();
+    return fbDb;
+  } catch (e) { return null; }
+}
+
+function randomCode() {
+  var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  var c = '';
+  for (var i = 0; i < 4; i++) c += chars[Math.floor(Math.random() * chars.length)];
+  return c;
+}
+
+function joinSession() {
+  var code = document.getElementById('session-join-input').value.trim().toUpperCase();
+  if (code.length !== 4) { toast('Vul een 4-cijferige code in'); return; }
+  sessionPeer = code;
+  startGame();
+}
+
+function skipSession() {
+  sessionPeer = null;
+  startGame();
+}
+
+function pushScore() {
+  if (!myRef) return;
+  myRef.update({
+    g: group,
+    score: scores.reduce(function(a,b){return a+b;},0),
+    hole: stopIdx + 1,
+    total: getStops().length,
+    ts: Date.now()
+  });
+}
+
+function pushLocation(lat, lng) {
+  if (!myRef) return;
+  myRef.update({ lat: lat, lng: lng, ts: Date.now() });
+}
+
+function startSync() {
+  if (!sessionCode) return;
+  var db = getFirebase();
+  if (!db) return;
+
+  if (!playerId) playerId = group + '-' + randomCode();
+
+  myRef = db.ref('sessions/' + sessionCode + '/players/' + playerId);
+  myRef.set({ g: group, score: 0, hole: stopIdx + 1, total: getStops().length, ts: Date.now() });
+  myRef.onDisconnect().remove();
+
+  if (!sessionPeer) return;
+  document.getElementById('live-score-bar').classList.add('visible');
+
+  // Listen to all players in the peer session, pick the first one whose group differs from ours
+  peerRef = db.ref('sessions/' + sessionPeer + '/players');
+  peerRef.on('value', function(snap) {
+    var data = snap.val();
+    var myScore = scores.reduce(function(a,b){return a+b;},0);
+    var myG = group;
+    var myKey = 'ls-score-' + myG.toLowerCase();
+    document.getElementById(myKey).textContent = myScore;
+    document.getElementById('ls-hole-' + myG.toLowerCase()).textContent = 'hole ' + stopIdx;
+
+    if (!data) { document.getElementById('live-sync-dot').classList.remove('synced'); return; }
+
+    var theirEntry = null;
+    Object.keys(data).forEach(function(key) {
+      var p = data[key];
+      if (p.g !== myG) theirEntry = p;
+    });
+
+    if (!theirEntry) { document.getElementById('live-sync-dot').classList.remove('synced'); return; }
+
+    var theirG = theirEntry.g;
+    var theirKey = 'ls-score-' + theirG.toLowerCase();
+    document.getElementById(theirKey).textContent = theirEntry.score;
+    document.getElementById('ls-hole-' + theirG.toLowerCase()).textContent = 'hole ' + theirEntry.hole;
+
+    // highlight who's winning (lower = better)
+    var myEl = document.getElementById('ls-team-' + myG.toLowerCase());
+    var theirEl = document.getElementById('ls-team-' + theirG.toLowerCase());
+    myEl.classList.toggle('winning', myScore <= theirEntry.score);
+    theirEl.classList.toggle('winning', theirEntry.score < myScore);
+    document.getElementById('live-sync-dot').classList.add('synced');
+
+    // show other group's live location on the map
+    if (theirEntry.lat != null && theirEntry.lng != null) {
+      updateMapPeer(theirEntry.lat, theirEntry.lng, theirG);
+    }
+  });
+}
+
+function updateMapPeer(lat, lng, theirG) {
+  if (!map) return;
+  var peerIcon = L.divIcon({
+    html: '<div style="position:relative;width:26px;height:26px;">' +
+            '<div style="position:absolute;inset:0;background:#1de9b6;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 4px rgba(29,233,182,0.35);' +
+            'display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;color:#000;">' + theirG + '</div>' +
+          '</div>',
+    iconSize:[26,26], iconAnchor:[13,13], className:''
+  });
+  if (peerMarker) { peerMarker.setLatLng([lat, lng]); peerMarker.setIcon(peerIcon); }
+  else peerMarker = L.marker([lat, lng], { icon: peerIcon, zIndexOffset: 900 }).addTo(map);
+}
+
+function stopSync() {
+  if (peerRef) { peerRef.off(); peerRef = null; }
+  if (myRef) { myRef.onDisconnect().cancel(); myRef.remove(); myRef = null; }
+}
+
+// ── ALARM + VIBRATION ─────────────────────────
+function triggerArrivalAlarm() {
+  // Vibrate: 3 short bursts
+  if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 400]);
+
+  // Sound: play a short fanfare using Web Audio API
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    var ctx = audioCtx;
+    var notes = [523, 659, 784, 1047]; // C5 E5 G5 C6
+    notes.forEach(function(freq, i) {
+      var osc = ctx.createOscillator();
+      var gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = freq;
+      osc.type = 'sine';
+      var t = ctx.currentTime + i * 0.12;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.4, t + 0.02);
+      gain.gain.linearRampToValueAtTime(0, t + 0.18);
+      osc.start(t);
+      osc.stop(t + 0.2);
+    });
+  } catch(e) {}
+
+  // Screen flash
+  var flash = document.getElementById('arrival-flash');
+  flash.classList.remove('go');
+  void flash.offsetWidth; // reflow to restart animation
+  flash.classList.add('go');
+}
+
+// ── CLUE REVEAL ANIMATION ─────────────────────
+function unlockClue(s) {
+  triggerArrivalAlarm();
+
+  // shake the lock first, then reveal
+  var locked = document.getElementById('clue-locked');
+  locked.classList.add('shake');
+  setTimeout(function() {
+    locked.classList.add('hidden');
+    locked.classList.remove('shake');
+    var open = document.getElementById('clue-open');
+    open.classList.add('visible');
+    open.classList.remove('animate');
+    void open.offsetWidth;
+    open.classList.add('animate');
+    document.getElementById('clue-title').textContent = s.clueTitle;
+    document.getElementById('clue-body').textContent = s.challenge;
+    document.getElementById('clue-par').textContent = s.par;
+
+    if (s.photo) {
+      document.getElementById('photo-section').classList.add('visible');
+      document.getElementById('photo-required-note').style.display = 'block';
+      if (photos[stopIdx]) {
+        document.getElementById('photo-img').src = photos[stopIdx];
+        document.getElementById('photo-preview').classList.add('has-photo');
+      }
+    }
+    document.getElementById('btn-log').classList.add('visible');
+    toast('🔓 Clue vrijgegeven bij ' + s.name + '!');
+  }, 400);
+}
+
+// ── CAMERA ────────────────────────────────────
+function openCamera() {
+  var input = document.getElementById('camera-input');
+  input.value = '';
+  input.onchange = function() {
+    if (!input.files || !input.files[0]) return;
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      photos[stopIdx] = e.target.result;
+      document.getElementById('photo-img').src = e.target.result;
+      document.getElementById('photo-preview').classList.add('has-photo');
+      document.getElementById('photo-required-note').style.display = 'none';
+      toast('📸 Foto opgeslagen!');
+    };
+    reader.readAsDataURL(input.files[0]);
+  };
+  input.click();
+}
+
+function downloadCurrentPhoto() {
+  var d = photos[stopIdx]; if (!d) return;
+  var a = document.createElement('a');
+  a.href = d;
+  a.download = 'pubgolf_' + getStops()[stopIdx].name.replace(/\s+/g,'_') + '.jpg';
+  a.click();
+}
+
+function downloadStripPhoto(idx) {
+  var d = photos[idx]; if (!d) return;
+  var a = document.createElement('a');
+  a.href = d;
+  a.download = 'pubgolf_' + getStops()[idx].name.replace(/\s+/g,'_') + '.jpg';
+  a.click();
+}
+
+// ── SCORING ───────────────────────────────────
+function showScoreArea() {
+  var s = getStops()[stopIdx];
+  // photo required check
+  if (s.photo && !photos[stopIdx]) {
+    toast('📸 Maak eerst een groepsfoto!');
+    document.getElementById('photo-required-note').style.display = 'block';
+    return;
+  }
+  var grid = document.getElementById('score-grid');
+  grid.innerHTML = '';
+  for (var n = 1; n <= s.par + 3; n++) {
+    (function(num) {
+      var chip = document.createElement('button');
+      chip.className = 'score-chip';
+      var d = num - s.par;
+      chip.innerHTML = num + '<sub>' + (d===0?'par':d>0?'+'+d:d) + '</sub>';
+      chip.onclick = function() {
+        document.querySelectorAll('.score-chip').forEach(function(c){c.classList.remove('selected');});
+        chip.classList.add('selected');
+        pickedScore = num;
+      };
+      grid.appendChild(chip);
+    })(n);
+  }
+  document.getElementById('score-area').classList.add('visible');
+  document.getElementById('btn-log').classList.remove('visible');
+}
+
+function confirmScore() {
+  if (pickedScore === null) { toast('Kies eerst een aantal strokes!'); return; }
+  scores[stopIdx] = pickedScore;
+  pushScore();
+  stopIdx++;
+
+  // check bonus hole trigger
+  var bonus = course.bonus;
+  if (bonus && bonus.enabled && !bonusInserted && stopIdx === bonus.triggerAfterHole) {
+    bonusPending = true;
+    // show bonus interstitial
+    document.getElementById('bonus-hole-name').textContent = bonus.name;
+    document.getElementById('bonus-hole-addr').textContent = bonus.address;
+    document.getElementById('bonus-hole-challenge').textContent = bonus.challenge;
+    show('screen-bonus');
+    return;
+  }
+
+  advanceStop();
+}
+
+function acceptBonus() {
+  // Insert bonus stop after current position
+  var bonus = course.bonus;
+  var bonusStop = { name: bonus.name, address: bonus.address, lat: bonus.lat, lng: bonus.lng, par: bonus.par, clueTitle: '⭐ Bonus Challenge', challenge: bonus.challenge, photo: false, wildcard: false, _bonus: true };
+  course[group].splice(stopIdx, 0, bonusStop);
+  bonusInserted = true;
+  bonusPending = false;
+  show('screen-game');
+  advanceStop();
+}
+
+function skipBonus() {
+  bonusInserted = true;
+  bonusPending = false;
+  show('screen-game');
+  advanceStop();
+}
+
+function advanceStop() {
+  if (stopIdx >= getStops().length) { finishGame(); return; }
+  renderStop();
+  renderScorecard();
+  toast('✓ Hole gedaan! Volgende: hole ' + (stopIdx+1));
+}
+
+// ── FINISH ────────────────────────────────────
+function finishGame() {
+  stopGPS();
+  stopSync();
+  var stops = getStops();
+  var total = scores.reduce(function(a,b){return a+b;},0);
+  var par = stops.reduce(function(a,s){return a+s.par;},0);
+  var d = total - par;
+  document.getElementById('finish-sub').textContent = 'Group ' + group + ' · ' + (d>0?'+'+d:d===0?'gelijk aan par':String(d)) + ' vs par';
+  document.getElementById('final-num').textContent = total;
+  document.getElementById('final-rows').innerHTML = stops.map(function(s,i){
+    return '<div class="final-row"><span>' + (s._bonus?'⭐ ':'')+s.name+'</span><span>'+(scores[i]!==undefined?scores[i]:'—')+' / par '+s.par+'</span></div>';
+  }).join('');
+
+  // photo strip
+  var keys = Object.keys(photos);
+  if (keys.length > 0) {
+    document.getElementById('photo-strip-wrap').style.display = 'block';
+    var strip = document.getElementById('photo-strip');
+    strip.innerHTML = '';
+    keys.forEach(function(idx) {
+      var stopName = stops[idx] ? stops[idx].name : 'Hole '+(parseInt(idx)+1);
+      var frame = document.createElement('div');
+      frame.className = 'strip-frame';
+      frame.innerHTML =
+        '<img src="'+photos[idx]+'" alt="'+stopName+'">' +
+        '<div class="strip-frame-label">'+stopName+'</div>' +
+        '<button class="strip-dl" onclick="downloadStripPhoto('+idx+')">⬇ opslaan</button>';
+      strip.appendChild(frame);
+    });
+  } else {
+    document.getElementById('photo-strip-wrap').style.display = 'none';
+  }
+
+  show('screen-finish');
+}
+
+function restart() { stopGPS(); stopSync(); photos = {}; show('screen-intro'); }
+
+// ── TOAST ─────────────────────────────────────
+var toastTimer = null;
+function toast(msg) {
+  var el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){el.classList.remove('show');}, 2800);
+}
+
+// ── GEO MATH ─────────────────────────────────
+function haversine(lat1,lon1,lat2,lon2) {
+  var R=6371000, dL=(lat2-lat1)*Math.PI/180, dO=(lon2-lon1)*Math.PI/180;
+  var a=Math.sin(dL/2)*Math.sin(dL/2)+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dO/2)*Math.sin(dO/2);
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+function bearing(lat1,lon1,lat2,lon2) {
+  var dO=(lon2-lon1)*Math.PI/180;
+  var y=Math.sin(dO)*Math.cos(lat2*Math.PI/180);
+  var x=Math.cos(lat1*Math.PI/180)*Math.sin(lat2*Math.PI/180)-Math.sin(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.cos(dO);
+  return(Math.atan2(y,x)*180/Math.PI+360)%360;
+}
+
+// ── EDITOR ───────────────────────────────────
+function openEditor() {
+  renderEditor('A'); renderEditor('B');
+  renderWildcardEditor('mobile'); renderWildcardEditor('desktop');
+  renderBonusEditor('mobile'); renderBonusEditor('desktop');
+  editTab = 'A';
+  document.getElementById('panel-a').style.display = 'block';
+  document.getElementById('panel-b').style.display = 'none';
+  document.getElementById('panel-wc').style.display = 'none';
+  document.getElementById('tab-a').className = 'tab-btn sel-a';
+  document.getElementById('tab-b').className = 'tab-btn';
+  document.getElementById('tab-wc').className = 'tab-btn';
+  show('screen-edit');
+}
+
+function switchTab(t) {
+  editTab = t;
+  document.getElementById('tab-a').className = 'tab-btn'+(t==='A'?' sel-a':'');
+  document.getElementById('tab-b').className = 'tab-btn'+(t==='B'?' sel-b':'');
+  document.getElementById('tab-wc').className = 'tab-btn'+(t==='WC'?' sel-wc':'');
+  document.getElementById('panel-a').style.display = t==='A'?'block':'none';
+  document.getElementById('panel-b').style.display = t==='B'?'block':'none';
+  document.getElementById('panel-wc').style.display = t==='WC'?'block':'none';
+}
+
+function safeVal(s) { return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+function safeText(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+
+function renderEditor(g) {
+  var box = document.getElementById('editor-'+g.toLowerCase());
+  box.innerHTML = '';
+  course[g].forEach(function(s, i) {
+    var d = document.createElement('div');
+    d.className = 'stop-block';
+    d.innerHTML =
+      '<div class="stop-block-head"><div class="stop-block-num">HOLE '+(i+1)+'</div>' +
+      '<button class="btn-remove" onclick="removeStop(\''+g+'\','+i+')">Verwijder</button></div>' +
+      '<div class="stop-fields-grid">' +
+        '<div class="field"><label>Naam</label><input type="text" id="f-'+g+'-'+i+'-name" value="'+safeVal(s.name)+'"></div>' +
+        '<div class="field"><label>Adres</label><input type="text" id="f-'+g+'-'+i+'-address" value="'+safeVal(s.address)+'"></div>' +
+        '<div class="field"><label>Latitude</label><input type="number" step="0.0001" id="f-'+g+'-'+i+'-lat" value="'+s.lat+'"></div>' +
+        '<div class="field"><label>Longitude</label><input type="number" step="0.0001" id="f-'+g+'-'+i+'-lng" value="'+s.lng+'"></div>' +
+        '<div class="field"><label>Par</label><input type="number" min="1" max="9" id="f-'+g+'-'+i+'-par" value="'+s.par+'"></div>' +
+        '<div class="field"><label>Challenge Titel</label><input type="text" id="f-'+g+'-'+i+'-clueTitle" value="'+safeVal(s.clueTitle)+'"></div>' +
+        '<div class="field full"><label>Challenge Omschrijving</label><textarea id="f-'+g+'-'+i+'-challenge">'+safeText(s.challenge)+'</textarea></div>' +
+        '<div class="field full"><div class="photo-toggle-row">' +
+          '<span class="photo-toggle-label">📸 Foto verplicht</span>' +
+          '<label class="toggle-switch"><input type="checkbox" id="f-'+g+'-'+i+'-photo"'+(s.photo?' checked':'')+'><span class="toggle-track"></span></label>' +
+        '</div></div>' +
+        '<div class="field full"><div class="wildcard-toggle-row">' +
+          '<span class="wildcard-toggle-label">🃏 Wildcard hole</span>' +
+          '<label class="toggle-switch"><input type="checkbox" id="f-'+g+'-'+i+'-wildcard"'+(s.wildcard?' checked':'')+'><span class="toggle-track"></span></label>' +
+        '</div></div>' +
+      '</div>';
+    box.appendChild(d);
+  });
+}
+
+function renderWildcardEditor(suffix) {
+  var box = document.getElementById('wildcard-editor-'+suffix);
+  if (!box) return;
+  var wcs = course.wildcards || [];
+  var html = '<div class="wildcard-editor">' +
+    '<div class="wildcard-editor-title">🃏 Wildcard Pool</div>' +
+    '<div class="wildcard-editor-sub">Wordt random getoond bij wildcard holes.</div>' +
+    '<div class="wildcard-list" id="wc-list-'+suffix+'">';
+  wcs.forEach(function(w, i) {
+    html += '<div class="wildcard-item">' +
+      '<input type="text" id="wc-'+suffix+'-'+i+'" value="'+safeVal(w)+'">' +
+      '<button class="btn-wc-remove" onclick="removeWildcard(\''+suffix+'\','+i+')">×</button>' +
+      '</div>';
+  });
+  html += '</div><button class="btn-wc-add" onclick="addWildcard(\''+suffix+'\')">+ Wildcard toevoegen</button></div>';
+  box.innerHTML = html;
+}
+
+function addWildcard(suffix) {
+  course.wildcards = course.wildcards || [];
+  course.wildcards.push('Nieuw wildcard');
+  renderWildcardEditor(suffix);
+  // sync other
+  var other = suffix === 'mobile' ? 'desktop' : 'mobile';
+  renderWildcardEditor(other);
+}
+
+function removeWildcard(suffix, i) {
+  course.wildcards.splice(i, 1);
+  renderWildcardEditor(suffix);
+  var other = suffix === 'mobile' ? 'desktop' : 'mobile';
+  renderWildcardEditor(other);
+}
+
+function renderBonusEditor(suffix) {
+  var box = document.getElementById('bonus-editor-'+suffix);
+  if (!box) return;
+  var b = course.bonus || {};
+  var enabled = !!b.enabled;
+  box.innerHTML = '<div class="bonus-editor">' +
+    '<div class="bonus-editor-title">⭐ Bonus Hole</div>' +
+    '<div class="bonus-editor-sub">Verschijnt als verrassing na een bepaalde hole.</div>' +
+    '<div class="bonus-enable-row">' +
+      '<span class="bonus-enable-label">Bonus hole inschakelen</span>' +
+      '<label class="toggle-switch"><input type="checkbox" id="bonus-enabled-'+suffix+'"'+(enabled?' checked':'')+' onchange="toggleBonusFields(\''+suffix+'\')">' +
+      '<span class="toggle-track"></span></label>' +
+    '</div>' +
+    '<div class="bonus-fields'+(enabled?' visible':'')+'" id="bonus-fields-'+suffix+'">' +
+      '<div class="field"><label>Na hole #</label><input type="number" min="1" max="20" id="bonus-trigger-'+suffix+'" value="'+(b.triggerAfterHole||4)+'"></div>' +
+      '<div class="field"><label>Naam</label><input type="text" id="bonus-name-'+suffix+'" value="'+safeVal(b.name||'')+'"></div>' +
+      '<div class="field"><label>Adres</label><input type="text" id="bonus-addr-'+suffix+'" value="'+safeVal(b.address||'')+'"></div>' +
+      '<div class="field coords-pair">' +
+        '<div><label>Latitude</label><input type="number" step="0.0001" id="bonus-lat-'+suffix+'" value="'+(b.lat||52.3702)+'"></div>' +
+        '<div><label>Longitude</label><input type="number" step="0.0001" id="bonus-lng-'+suffix+'" value="'+(b.lng||4.8952)+'"></div>' +
+      '</div>' +
+      '<div class="field"><label>Par</label><input type="number" min="1" max="9" id="bonus-par-'+suffix+'" value="'+(b.par||2)+'"></div>' +
+      '<div class="field"><label>Challenge</label><textarea id="bonus-challenge-'+suffix+'">'+safeText(b.challenge||'')+'</textarea></div>' +
+    '</div>' +
+  '</div>';
+}
+
+function toggleBonusFields(suffix) {
+  var checked = document.getElementById('bonus-enabled-'+suffix).checked;
+  var fields = document.getElementById('bonus-fields-'+suffix);
+  if (checked) fields.classList.add('visible'); else fields.classList.remove('visible');
+}
+
+function readEditor(g) {
+  var result = [];
+  for (var i = 0; i < course[g].length; i++) {
+    result.push({
+      name:      document.getElementById('f-'+g+'-'+i+'-name').value,
+      address:   document.getElementById('f-'+g+'-'+i+'-address').value,
+      lat:       parseFloat(document.getElementById('f-'+g+'-'+i+'-lat').value)||0,
+      lng:       parseFloat(document.getElementById('f-'+g+'-'+i+'-lng').value)||0,
+      par:       parseInt(document.getElementById('f-'+g+'-'+i+'-par').value)||2,
+      clueTitle: document.getElementById('f-'+g+'-'+i+'-clueTitle').value,
+      challenge: document.getElementById('f-'+g+'-'+i+'-challenge').value,
+      photo:     document.getElementById('f-'+g+'-'+i+'-photo').checked,
+      wildcard:  document.getElementById('f-'+g+'-'+i+'-wildcard').checked
+    });
+  }
+  return result;
+}
+
+function readWildcards(suffix) {
+  var result = [];
+  var wcs = course.wildcards || [];
+  wcs.forEach(function(_, i) {
+    var el = document.getElementById('wc-'+suffix+'-'+i);
+    if (el) result.push(el.value);
+  });
+  return result;
+}
+
+function readBonus(suffix) {
+  var get = function(id) { var el = document.getElementById(id); return el ? el.value : ''; };
+  return {
+    enabled:          !!(document.getElementById('bonus-enabled-'+suffix) && document.getElementById('bonus-enabled-'+suffix).checked),
+    triggerAfterHole: parseInt(get('bonus-trigger-'+suffix))||4,
+    name:             get('bonus-name-'+suffix),
+    address:          get('bonus-addr-'+suffix),
+    lat:              parseFloat(get('bonus-lat-'+suffix))||52.3702,
+    lng:              parseFloat(get('bonus-lng-'+suffix))||4.8952,
+    par:              parseInt(get('bonus-par-'+suffix))||2,
+    challenge:        get('bonus-challenge-'+suffix)
+  };
+}
+
+function saveRoute() {
+  course.A = readEditor('A');
+  course.B = readEditor('B');
+  // read wildcards from whichever suffix is visible
+  var wcSuffix = window.innerWidth >= 900 ? 'desktop' : 'mobile';
+  course.wildcards = readWildcards(wcSuffix);
+  course.bonus = readBonus(wcSuffix);
+  localStorage.setItem('pg_course', JSON.stringify(course));
+  toast('✅ Course opgeslagen!');
+  setTimeout(goHome, 700);
+}
+
+function addStop(g) {
+  course[g].push({ name:'Nieuwe Stop', address:'Adres invoeren', lat:52.3702, lng:4.8952, par:2, clueTitle:'Nieuwe Challenge', challenge:'Omschrijf de challenge hier.', photo:false, wildcard:false });
+  renderEditor(g);
+  setTimeout(function() {
+    var box = document.getElementById('editor-'+g.toLowerCase());
+    if (box.lastChild) box.lastChild.scrollIntoView({ behavior:'smooth' });
+  }, 60);
+}
+
+function removeStop(g, i) {
+  course[g].splice(i, 1);
+  renderEditor(g);
+}
+
+// ── PWA ───────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('./sw.js').catch(function() {});
+  });
+}
+</script>
+</body>
+</html>
