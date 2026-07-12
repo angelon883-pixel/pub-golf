@@ -480,6 +480,12 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
     <div class="edit-title">Edit Course</div>
     <div class="edit-sub" id="edit-sub">Configureer stops, wildcards en de geheime bonus hole.</div>
 
+    <!-- TEAM NAMES -->
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px;">
+      <div class="field"><label style="color:var(--primary);">🔥 Naam Team A</label><input type="text" id="team-name-a" maxlength="20" placeholder="Team A"></div>
+      <div class="field"><label style="color:var(--secondary);">💀 Naam Team B</label><input type="text" id="team-name-b" maxlength="20" placeholder="Team B"></div>
+    </div>
+
     <div style="text-align:center; margin-bottom:12px;">
       <button class="btn-session-join" style="font-size:13px; padding:10px 20px;" onclick="openCsvModal()">📥 Importeer via CSV</button>
     </div>
@@ -546,12 +552,12 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
     <div class="live-score-label">Live</div>
     <div class="live-score-teams">
       <div class="live-score-team" id="ls-team-a">
-        <div class="live-score-team-name a">Group A</div>
+        <div class="live-score-team-name a" id="ls-name-a">Team A</div>
         <div class="live-score-team-num" id="ls-score-a">—</div>
         <div class="live-score-team-hole" id="ls-hole-a">hole —</div>
       </div>
       <div class="live-score-team" id="ls-team-b">
-        <div class="live-score-team-name b">Group B</div>
+        <div class="live-score-team-name b" id="ls-name-b">Team B</div>
         <div class="live-score-team-num" id="ls-score-b">—</div>
         <div class="live-score-team-hole" id="ls-hole-b">hole —</div>
       </div>
@@ -682,6 +688,8 @@ var DEFAULTS = {
     { name:"The Tasting Room",    address:"Nes 37",                   lat:52.3712, lng:4.8969, par:1, clueTitle:"Drink Storyteller",     challenge:"Verzin een naam en verhaal voor je drankje. Vertel het aan de groep.", photo:true,  wildcard:false },
     { name:"Club House",          address:"Amstel 54",                lat:52.3656, lng:4.9010, par:3, clueTitle:"Victory Dance",         challenge:"Doe een overwinningsdans na het drinken. De groep geeft een cijfer.", photo:false, wildcard:true }
   ],
+  nameA: 'Team A',
+  nameB: 'Team B',
   wildcards: [
     "Drink je glas omhoog houdend met gestrekte arm",
     "Wissel glas met de persoon naast je",
@@ -966,8 +974,10 @@ function updateTravelTime(dist) {
 
 function startGame() {
   var hdr = document.getElementById('hdr-group');
-  hdr.textContent = 'GROUP ' + group;
+  hdr.textContent = (group === 'A' ? course.nameA : course.nameB) || ('GROUP ' + group);
   hdr.className = 'header-group ' + group.toLowerCase();
+  document.getElementById('ls-name-a').textContent = course.nameA || 'Team A';
+  document.getElementById('ls-name-b').textContent = course.nameB || 'Team B';
   renderStop();
   renderScorecard();
   show('screen-game');
@@ -1366,7 +1376,7 @@ function finishGame() {
   var total = scores.reduce(function(a,b){return a+b;},0);
   var par = stops.reduce(function(a,s){return a+s.par;},0);
   var d = total - par;
-  document.getElementById('finish-sub').textContent = 'Group ' + group + ' · ' + (d>0?'+'+d:d===0?'gelijk aan par':String(d)) + ' vs par';
+  document.getElementById('finish-sub').textContent = (group === 'A' ? (course.nameA||'Team A') : (course.nameB||'Team B')) + ' · ' + (d>0?'+'+d:d===0?'gelijk aan par':String(d)) + ' vs par';
   document.getElementById('final-num').textContent = total;
   document.getElementById('final-rows').innerHTML = stops.map(function(s,i){
     return '<div class="final-row"><span>' + (s._bonus?'⭐ ':'')+s.name+'</span><span>'+(scores[i]!==undefined?scores[i]:'—')+' / par '+s.par+'</span></div>';
@@ -1426,6 +1436,8 @@ function openEditor() {
   sub.textContent = sessionCode
     ? 'Configureer stops, wildcards en de geheime bonus hole. Wordt opgeslagen onder sessie ' + sessionCode + '.'
     : 'Configureer stops, wildcards en de geheime bonus hole.';
+  document.getElementById('team-name-a').value = course.nameA || 'Team A';
+  document.getElementById('team-name-b').value = course.nameB || 'Team B';
   renderEditor('A'); renderEditor('B');
   renderWildcardEditor('mobile'); renderWildcardEditor('desktop');
   renderBonusEditor('mobile'); renderBonusEditor('desktop');
@@ -1605,6 +1617,8 @@ function readBonus(suffix) {
 }
 
 function saveRoute() {
+  course.nameA = document.getElementById('team-name-a').value.trim() || 'Team A';
+  course.nameB = document.getElementById('team-name-b').value.trim() || 'Team B';
   course.A = readEditor('A');
   course.B = readEditor('B');
   // read wildcards from whichever suffix is visible
@@ -1710,8 +1724,9 @@ function importCSV() {
   var count = 0;
   lines.slice(1).forEach(function(line) {
     var cols = parseCSVLine(line);
-    var g = (cols[idx.groep] || '').toUpperCase().trim();
-    if (g !== 'A' && g !== 'B') return;
+    var raw = (cols[idx.groep] || '').trim();
+    var g = /^(a|1|team\s*a|team\s*1)$/i.test(raw) ? 'A' : /^(b|2|team\s*b|team\s*2)$/i.test(raw) ? 'B' : null;
+    if (!g) return;
     course[g].push({
       name: (cols[idx.naam] || 'Stop').trim(),
       address: (cols[idx.adres] || '').trim(),
