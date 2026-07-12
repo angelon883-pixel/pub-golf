@@ -474,8 +474,8 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
 
     <!-- MOBILE single column -->
     <div class="mobile-only">
-      <div id="panel-a"><div id="editor-a"></div><button class="btn-add-stop" onclick="addStop('A')">+ Stop toevoegen</button></div>
-      <div id="panel-b" style="display:none"><div id="editor-b"></div><button class="btn-add-stop" onclick="addStop('B')">+ Stop toevoegen</button></div>
+      <div id="panel-a"><div id="editor-a-mobile"></div><button class="btn-add-stop" onclick="addStop('A')">+ Stop toevoegen</button></div>
+      <div id="panel-b" style="display:none"><div id="editor-b-mobile"></div><button class="btn-add-stop" onclick="addStop('B')">+ Stop toevoegen</button></div>
       <div id="panel-wc" style="display:none">
         <div id="wildcard-editor-mobile"></div>
         <div id="bonus-editor-mobile"></div>
@@ -489,12 +489,12 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
       <div class="desktop-columns">
         <div>
           <div class="desktop-col-header col-a">🔥 Group A</div>
-          <div id="editor-a"></div>
+          <div id="editor-a-desktop"></div>
           <button class="btn-add-stop-col" onclick="addStop('A')">+ Stop toevoegen aan Group A</button>
         </div>
         <div>
           <div class="desktop-col-header col-b">💀 Group B</div>
-          <div id="editor-b"></div>
+          <div id="editor-b-desktop"></div>
           <button class="btn-add-stop-col" onclick="addStop('B')">+ Stop toevoegen aan Group B</button>
         </div>
       </div>
@@ -1434,35 +1434,42 @@ function safeVal(s) { return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&
 function safeText(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
 
 function renderEditor(g) {
-  var box = document.getElementById('editor-'+g.toLowerCase());
-  box.innerHTML = '';
-  course[g].forEach(function(s, i) {
-    var d = document.createElement('div');
-    d.className = 'stop-block';
-    d.innerHTML =
-      '<div class="stop-block-head"><div class="stop-block-num">HOLE '+(i+1)+'</div>' +
-      '<button class="btn-remove" onclick="removeStop(\''+g+'\','+i+')">Verwijder</button></div>' +
-      '<div class="stop-fields-grid">' +
-        '<div class="field"><label>Naam</label><input type="text" id="f-'+g+'-'+i+'-name" value="'+safeVal(s.name)+'"></div>' +
-        '<div class="field full"><label>Adres</label><div style="display:flex; gap:8px;">' +
-          '<input type="text" id="f-'+g+'-'+i+'-address" value="'+safeVal(s.address)+'" style="flex:1;">' +
-          '<button class="btn-session-join" style="padding:10px 14px; font-size:13px; white-space:nowrap;" onclick="geocodeStop(\''+g+'\','+i+')">🔍 Zoek</button>' +
-        '</div></div>' +
-        '<div class="field"><label>Latitude</label><input type="number" step="0.000001" id="f-'+g+'-'+i+'-lat" value="'+s.lat+'"></div>' +
-        '<div class="field"><label>Longitude</label><input type="number" step="0.000001" id="f-'+g+'-'+i+'-lng" value="'+s.lng+'"></div>' +
-        '<div class="field"><label>Par</label><input type="number" min="1" max="9" id="f-'+g+'-'+i+'-par" value="'+s.par+'"></div>' +
-        '<div class="field"><label>Challenge Titel</label><input type="text" id="f-'+g+'-'+i+'-clueTitle" value="'+safeVal(s.clueTitle)+'"></div>' +
-        '<div class="field full"><label>Challenge Omschrijving</label><textarea id="f-'+g+'-'+i+'-challenge">'+safeText(s.challenge)+'</textarea></div>' +
-        '<div class="field full"><div class="photo-toggle-row">' +
-          '<span class="photo-toggle-label">📸 Foto verplicht</span>' +
-          '<label class="toggle-switch"><input type="checkbox" id="f-'+g+'-'+i+'-photo"'+(s.photo?' checked':'')+'><span class="toggle-track"></span></label>' +
-        '</div></div>' +
-        '<div class="field full"><div class="wildcard-toggle-row">' +
-          '<span class="wildcard-toggle-label">🃏 Wildcard hole</span>' +
-          '<label class="toggle-switch"><input type="checkbox" id="f-'+g+'-'+i+'-wildcard"'+(s.wildcard?' checked':'')+'><span class="toggle-track"></span></label>' +
-        '</div></div>' +
-      '</div>';
-    box.appendChild(d);
+  var gl = g.toLowerCase();
+  var targets = [
+    document.getElementById('editor-'+gl+'-mobile'),
+    document.getElementById('editor-'+gl+'-desktop')
+  ];
+  targets.forEach(function(box) {
+    if (!box) return;
+    box.innerHTML = '';
+    course[g].forEach(function(s, i) {
+      var d = document.createElement('div');
+      d.className = 'stop-block';
+      d.innerHTML =
+        '<div class="stop-block-head"><div class="stop-block-num">HOLE '+(i+1)+'</div>' +
+        '<button class="btn-remove" onclick="removeStop(\''+g+'\','+i+')">Verwijder</button></div>' +
+        '<div class="stop-fields-grid">' +
+          '<div class="field"><label>Naam</label><input type="text" id="f-'+g+'-'+i+'-name" value="'+safeVal(s.name)+'"></div>' +
+          '<div class="field full"><label>Adres</label><div style="display:flex; gap:8px;">' +
+            '<input type="text" id="f-'+g+'-'+i+'-address" value="'+safeVal(s.address)+'" style="flex:1;">' +
+            '<button class="btn-session-join" style="padding:10px 14px; font-size:13px; white-space:nowrap;" onclick="geocodeStop(\''+g+'\','+i+')">🔍 Zoek</button>' +
+          '</div></div>' +
+          '<div class="field"><label>Latitude</label><input type="number" step="0.000001" id="f-'+g+'-'+i+'-lat" value="'+s.lat+'"></div>' +
+          '<div class="field"><label>Longitude</label><input type="number" step="0.000001" id="f-'+g+'-'+i+'-lng" value="'+s.lng+'"></div>' +
+          '<div class="field"><label>Par</label><input type="number" min="1" max="9" id="f-'+g+'-'+i+'-par" value="'+s.par+'"></div>' +
+          '<div class="field"><label>Challenge Titel</label><input type="text" id="f-'+g+'-'+i+'-clueTitle" value="'+safeVal(s.clueTitle)+'"></div>' +
+          '<div class="field full"><label>Challenge Omschrijving</label><textarea id="f-'+g+'-'+i+'-challenge">'+safeText(s.challenge)+'</textarea></div>' +
+          '<div class="field full"><div class="photo-toggle-row">' +
+            '<span class="photo-toggle-label">📸 Foto verplicht</span>' +
+            '<label class="toggle-switch"><input type="checkbox" id="f-'+g+'-'+i+'-photo"'+(s.photo?' checked':'')+'><span class="toggle-track"></span></label>' +
+          '</div></div>' +
+          '<div class="field full"><div class="wildcard-toggle-row">' +
+            '<span class="wildcard-toggle-label">🃏 Wildcard hole</span>' +
+            '<label class="toggle-switch"><input type="checkbox" id="f-'+g+'-'+i+'-wildcard"'+(s.wildcard?' checked':'')+'><span class="toggle-track"></span></label>' +
+          '</div></div>' +
+        '</div>';
+      box.appendChild(d);
+    });
   });
 }
 
@@ -1631,8 +1638,10 @@ function addStop(g) {
   course[g].push({ name:'Nieuwe Stop', address:'Adres invoeren', lat:52.3702, lng:4.8952, par:2, clueTitle:'Nieuwe Challenge', challenge:'Omschrijf de challenge hier.', photo:false, wildcard:false });
   renderEditor(g);
   setTimeout(function() {
-    var box = document.getElementById('editor-'+g.toLowerCase());
-    if (box.lastChild) box.lastChild.scrollIntoView({ behavior:'smooth' });
+    var gl = g.toLowerCase();
+    var box = [document.getElementById('editor-'+gl+'-desktop'), document.getElementById('editor-'+gl+'-mobile')]
+      .find(function(el) { return el && el.offsetParent !== null; });
+    if (box && box.lastChild) box.lastChild.scrollIntoView({ behavior:'smooth' });
   }, 60);
 }
 
