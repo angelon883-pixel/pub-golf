@@ -417,11 +417,18 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
   <div class="modal-box" style="max-width:480px;">
     <div class="session-title">📥 Importeer CSV</div>
     <div style="font-size:12px; color:var(--muted); margin-bottom:10px; text-align:left;">
-      Kopieer je sheet als CSV en plak hieronder. Eerste rij = headers:<br>
+      Eerste rij = headers:<br>
       <code style="font-size:11px; color:var(--text);">Groep,Naam,Adres,Par,Challenge Titel,Challenge Omschrijving,Foto,Wildcard</code>
     </div>
-    <textarea id="csv-input" style="width:100%; box-sizing:border-box; background:var(--dark); border:1px solid var(--border); border-radius:10px; color:var(--text); font-family:'DM Mono',monospace; font-size:12px; padding:12px; margin-bottom:12px; height:160px; resize:vertical;" placeholder="Groep,Naam,Adres,Par,Challenge Titel,Challenge Omschrijving,Foto,Wildcard&#10;A,De Kroon,Rembrandtplein 17 Amsterdam,3,Drink in één teug,Drink in één keer op.,nee,nee&#10;B,Cafe Hoppe,Spui 18 Amsterdam,2,Ogen dicht,Bestel zonder de kaart.,nee,ja"></textarea>
-    <div style="font-size:11px; color:var(--muted); margin-bottom:12px; text-align:left;">⚠️ Dit vervangt bestaande stops niet — ze worden toegevoegd aan de huidige lijst.</div>
+    <div id="csv-drop-zone" style="border:2px dashed var(--border); border-radius:10px; padding:24px 16px; text-align:center; margin-bottom:12px; cursor:pointer; transition:border-color .2s, background .2s;" onclick="document.getElementById('csv-file-input').click()">
+      <div style="font-size:28px; margin-bottom:6px;">📂</div>
+      <div style="font-size:13px; color:var(--text);">Sleep je CSV-bestand hierheen</div>
+      <div style="font-size:11px; color:var(--muted); margin-top:4px;">of klik om te bladeren</div>
+      <input type="file" id="csv-file-input" accept=".csv,text/csv" style="display:none" onchange="handleCsvFile(this.files[0])">
+    </div>
+    <div id="csv-file-name" style="font-size:12px; color:var(--primary); margin-bottom:8px; display:none;"></div>
+    <textarea id="csv-input" style="width:100%; box-sizing:border-box; background:var(--dark); border:1px solid var(--border); border-radius:10px; color:var(--text); font-family:'DM Mono',monospace; font-size:12px; padding:12px; margin-bottom:12px; height:100px; resize:vertical;" placeholder="Of plak CSV-tekst hier…"></textarea>
+    <div style="font-size:11px; color:var(--muted); margin-bottom:12px; text-align:left;">⚠️ Stops worden toegevoegd aan de huidige lijst.</div>
     <div class="modal-actions">
       <button class="btn-back" onclick="closeCsvModal()">Annuleren</button>
       <button class="btn-session-join" onclick="importCSV()">Importeer</button>
@@ -1686,11 +1693,32 @@ function removeStop(g, i) {
 // ── CSV IMPORT ────────────────────────────────
 function openCsvModal() {
   document.getElementById('csv-input').value = '';
+  document.getElementById('csv-file-name').style.display = 'none';
+  document.getElementById('csv-file-input').value = '';
   document.getElementById('csv-modal').classList.add('show');
+  var dz = document.getElementById('csv-drop-zone');
+  dz.ondragover = function(e) { e.preventDefault(); dz.style.borderColor = 'var(--primary)'; dz.style.background = 'rgba(255,107,0,0.07)'; };
+  dz.ondragleave = function() { dz.style.borderColor = 'var(--border)'; dz.style.background = ''; };
+  dz.ondrop = function(e) {
+    e.preventDefault();
+    dz.style.borderColor = 'var(--border)'; dz.style.background = '';
+    var file = e.dataTransfer.files[0];
+    if (file) handleCsvFile(file);
+  };
 }
 
 function closeCsvModal() {
   document.getElementById('csv-modal').classList.remove('show');
+}
+
+function handleCsvFile(file) {
+  if (!file) return;
+  var nameEl = document.getElementById('csv-file-name');
+  nameEl.textContent = '✅ ' + file.name;
+  nameEl.style.display = 'block';
+  var reader = new FileReader();
+  reader.onload = function(e) { document.getElementById('csv-input').value = e.target.result; };
+  reader.readAsText(file, 'UTF-8');
 }
 
 function parseCSVLine(line) {
