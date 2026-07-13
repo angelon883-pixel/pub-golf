@@ -316,6 +316,72 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
 .modal-actions { display: flex; gap: 10px; }
 .modal-actions button { flex: 1; }
 
+/* ── CHALLENGE BLOCK IN EDITOR ── */
+.challenge-sub-block { background: #0d0400; border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 8px; }
+.challenge-sub-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.challenge-sub-num { font-size: 11px; letter-spacing: 3px; text-transform: uppercase; color: var(--gold); }
+.btn-remove-challenge { background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--secondary); font-size: 11px; padding: 3px 8px; cursor: pointer; font-family: 'DM Mono', monospace; }
+.btn-add-challenge { width: 100%; padding: 9px; background: transparent; border: 1px dashed var(--gold); border-radius: 8px; color: var(--gold); font-family: 'DM Mono', monospace; font-size: 12px; cursor: pointer; margin-top: 6px; margin-bottom: 6px; }
+
+/* ── LETTER REVEAL OVERLAY ── */
+#letter-reveal { display: none; position: fixed; inset: 0; z-index: 900; background: rgba(0,0,0,0.92); align-items: center; justify-content: center; flex-direction: column; text-align: center; }
+#letter-reveal.show { display: flex; }
+#letter-reveal-gif { max-width: 280px; max-height: 280px; border-radius: 14px; margin-bottom: 20px; }
+#letter-reveal-letter { font-family: 'Bebas Neue', sans-serif; font-size: 120px; color: var(--gold); line-height: 1; text-shadow: 0 0 60px rgba(255,214,0,0.6); }
+#letter-reveal-label { font-size: 13px; color: var(--muted); letter-spacing: 3px; text-transform: uppercase; margin-top: 8px; }
+#letter-reveal-bar { width: 200px; height: 4px; background: var(--border); border-radius: 2px; margin-top: 20px; overflow: hidden; }
+#letter-reveal-progress { height: 100%; background: var(--gold); width: 100%; transition: width 10s linear; }
+
+/* ── CHALLENGE PENDING OVERLAY (player side) ── */
+#pending-overlay { display: none; position: fixed; inset: 0; z-index: 800; background: rgba(0,0,0,0.85); align-items: center; justify-content: center; flex-direction: column; text-align: center; padding: 32px; }
+#pending-overlay.show { display: flex; }
+.pending-icon { font-size: 64px; margin-bottom: 16px; animation: pendingSpin 2s linear infinite; }
+@keyframes pendingSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+.pending-title { font-family: 'Bebas Neue', sans-serif; font-size: 36px; color: var(--text); margin-bottom: 8px; }
+.pending-sub { font-size: 13px; color: var(--muted); line-height: 1.6; }
+
+/* ── REFEREE SCREEN ── */
+#screen-referee { overflow-y: auto; flex-direction: column; }
+.referee-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; background: var(--dark); position: sticky; top: 0; z-index: 20; }
+.referee-title { font-family: 'Bebas Neue', sans-serif; font-size: 22px; color: var(--gold); }
+.referee-body { padding: 16px; }
+.referee-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-bottom: 16px; }
+.referee-card-label { font-size: 10px; letter-spacing: 4px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+.referee-card-title { font-family: 'Bebas Neue', sans-serif; font-size: 28px; color: var(--text); margin-bottom: 4px; }
+.referee-card-body { font-size: 13px; color: #ddc0a0; line-height: 1.7; }
+.referee-status { padding: 12px 16px; border-radius: 10px; font-size: 14px; text-align: center; margin-bottom: 16px; font-family: 'Bebas Neue', sans-serif; letter-spacing: 1px; }
+.referee-status.waiting { background: #1a1000; border: 1px solid var(--border); color: var(--muted); }
+.referee-status.pending { background: #1a0800; border: 1px solid var(--primary); color: var(--primary); animation: pendingPulse 1.5s ease infinite; }
+@keyframes pendingPulse { 0%,100% { border-color: var(--primary); } 50% { border-color: transparent; } }
+.btn-approve { width: 100%; padding: 16px; background: var(--green); border: none; border-radius: 10px; color: #000; font-family: 'Bebas Neue', sans-serif; font-size: 20px; letter-spacing: 2px; cursor: pointer; margin-bottom: 10px; }
+.btn-reject { width: 100%; padding: 14px; background: transparent; border: 1px solid var(--secondary); border-radius: 10px; color: var(--secondary); font-family: 'Bebas Neue', sans-serif; font-size: 18px; letter-spacing: 2px; cursor: pointer; }
+.letter-award-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.letter-award-chip { padding: 10px 16px; border: 2px solid var(--border); border-radius: 8px; background: var(--card); color: var(--muted); font-family: 'Bebas Neue', sans-serif; font-size: 24px; cursor: pointer; min-width: 50px; text-align: center; }
+.letter-award-chip.sel { border-color: var(--gold); color: var(--gold); background: #1a1000; }
+.earned-letters-strip { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.earned-letter-chip { width: 36px; height: 36px; border-radius: 8px; background: var(--gold); color: #000; font-family: 'Bebas Neue', sans-serif; font-size: 22px; display: flex; align-items: center; justify-content: center; }
+
+/* ── PUZZLE SCREEN ── */
+#screen-puzzle { overflow-y: auto; padding: 0; flex-direction: column; }
+.puzzle-header { padding: 20px 20px 10px; border-bottom: 1px solid var(--border); background: var(--dark); }
+.puzzle-title { font-family: 'Bebas Neue', sans-serif; font-size: 36px; color: var(--gold); }
+.puzzle-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.puzzle-body { padding: 20px; }
+.puzzle-letters-pool { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 28px; min-height: 56px; }
+.puzzle-letter { width: 52px; height: 52px; border-radius: 10px; background: var(--card); border: 2px solid var(--border); color: var(--text); font-family: 'Bebas Neue', sans-serif; font-size: 32px; display: flex; align-items: center; justify-content: center; cursor: grab; user-select: none; touch-action: none; transition: transform 0.15s, border-color 0.15s; }
+.puzzle-letter:active { transform: scale(1.1); border-color: var(--gold); }
+.puzzle-letter.dragging { opacity: 0.4; }
+.puzzle-letter.placed { display: none; }
+.puzzle-slots { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 20px; }
+.puzzle-slot { width: 52px; height: 52px; border-radius: 10px; border: 2px dashed var(--border); display: flex; align-items: center; justify-content: center; font-family: 'Bebas Neue', sans-serif; font-size: 32px; color: transparent; transition: border-color 0.2s, background 0.2s; }
+.puzzle-slot.has-letter { border-color: var(--gold); color: var(--gold); background: #1a1000; }
+.puzzle-slot.correct { border-color: var(--green); color: var(--green); background: #001a08; }
+.puzzle-slot.wrong { border-color: var(--secondary); animation: wrongShake 0.4s ease; }
+@keyframes wrongShake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+.puzzle-penalty { font-size: 28px; color: var(--secondary); font-family: 'Bebas Neue', sans-serif; text-align: center; margin-bottom: 10px; display: none; }
+.puzzle-score { font-size: 13px; color: var(--muted); text-align: center; }
+#puzzle-letters-collected { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-bottom: 12px; font-size: 12px; color: var(--muted); }
+
 /* ── CLUE REVEAL ANIMATION ── */
 @keyframes revealDrop {
   0%   { opacity:0; transform: translateY(-18px) scale(0.95); }
@@ -437,6 +503,21 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
 </div>
 <div class="arrival-flash" id="arrival-flash"></div>
 
+<!-- LETTER REVEAL OVERLAY -->
+<div id="letter-reveal">
+  <img id="letter-reveal-gif" src="" alt="">
+  <div id="letter-reveal-letter">?</div>
+  <div id="letter-reveal-label">Letter verdiend!</div>
+  <div id="letter-reveal-bar"><div id="letter-reveal-progress"></div></div>
+</div>
+
+<!-- PENDING OVERLAY (waiting for referee) -->
+<div id="pending-overlay">
+  <div class="pending-icon">⏳</div>
+  <div class="pending-title">Wachten op scheidsrechter…</div>
+  <div class="pending-sub">De scheidsrechter beoordeelt je challenge.<br>Je ontvangt een melding zodra het klaar is.</div>
+</div>
+
 <!-- SESSION CODE -->
 <div class="screen" id="screen-session">
   <div class="session-title">Sessie</div>
@@ -471,6 +552,13 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
     <button class="group-btn group-a" onclick="chooseGroup('A')"><span class="emoji">🔥</span>GROUP<br>A</button>
     <button class="group-btn group-b" onclick="chooseGroup('B')"><span class="emoji">💀</span>GROUP<br>B</button>
   </div>
+  <div id="referee-entry" style="margin-top:8px; width:100%; max-width:280px;">
+    <div class="session-or">— of als scheidsrechter —</div>
+    <div class="session-join-row" style="margin-bottom:8px;">
+      <input class="session-join-input" id="referee-code-input" maxlength="4" placeholder="CODE" oninput="this.value=this.value.toUpperCase()" style="font-size:22px;">
+      <button class="btn-session-join" onclick="enterRefereeMode()">🎯 Scheids</button>
+    </div>
+  </div>
 </div>
 
 <!-- INTRO -->
@@ -487,10 +575,11 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
     <div class="edit-title">Edit Course</div>
     <div class="edit-sub" id="edit-sub">Configureer stops, wildcards en de geheime bonus hole.</div>
 
-    <!-- TEAM NAMES -->
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px;">
+    <!-- TEAM NAMES + REFEREE CODE -->
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:16px;">
       <div class="field"><label style="color:var(--primary);">🔥 Naam Team A</label><input type="text" id="team-name-a" maxlength="20" placeholder="Team A"></div>
       <div class="field"><label style="color:var(--secondary);">💀 Naam Team B</label><input type="text" id="team-name-b" maxlength="20" placeholder="Team B"></div>
+      <div class="field"><label style="color:var(--gold);">🎯 Scheidsrechter code</label><input type="text" id="referee-code" maxlength="4" placeholder="XXXX" oninput="this.value=this.value.toUpperCase()"></div>
     </div>
 
     <div style="text-align:center; margin-bottom:12px;">
@@ -623,6 +712,7 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
         </div>
       </div>
 
+      <button class="btn-primary" id="btn-challenge-done" onclick="markChallengeDone()" style="background:var(--green); display:none;">✓ Challenge klaar!</button>
       <button class="btn-primary" id="btn-log" onclick="showScoreArea()">✓ Strokes invullen</button>
 
       <div class="score-area" id="score-area">
@@ -655,6 +745,54 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
   <button class="btn-bonus-skip" onclick="skipBonus()">Sla over</button>
 </div>
 
+<!-- REFEREE -->
+<div class="screen" id="screen-referee">
+  <div class="referee-header">
+    <div class="referee-title">🎯 Scheidsrechter</div>
+    <div id="referee-team-label" style="font-size:12px; color:var(--muted);"></div>
+  </div>
+  <div class="referee-body">
+    <div class="referee-card">
+      <div class="referee-card-label" id="ref-hole-label">HOLE 1</div>
+      <div class="referee-card-title" id="ref-stop-name">—</div>
+      <div style="font-size:12px; color:var(--muted); margin-bottom:12px;" id="ref-challenge-num"></div>
+      <div class="referee-card-label">Challenge</div>
+      <div style="font-size:14px; font-weight:bold; color:var(--text); margin-bottom:4px;" id="ref-clue-title">—</div>
+      <div class="referee-card-body" id="ref-clue-body">—</div>
+    </div>
+
+    <div class="referee-status waiting" id="referee-status">Wachten op team…</div>
+
+    <div id="referee-approve-panel" style="display:none;">
+      <div style="font-size:12px; color:var(--muted); margin-bottom:8px;">Welke letters ken je toe?</div>
+      <div class="letter-award-row" id="letter-award-row"></div>
+      <button class="btn-approve" onclick="refereeApprove()">✓ Goedkeuren</button>
+      <button class="btn-reject" onclick="refereeReject()">✕ Afkeuren</button>
+    </div>
+
+    <div style="margin-top:24px; padding-top:16px; border-top:1px solid var(--border);">
+      <div style="font-size:11px; letter-spacing:3px; text-transform:uppercase; color:var(--muted); margin-bottom:10px;">Verdiende letters</div>
+      <div class="earned-letters-strip" id="ref-earned-letters"></div>
+    </div>
+  </div>
+</div>
+
+<!-- PUZZLE -->
+<div class="screen" id="screen-puzzle">
+  <div class="puzzle-header">
+    <div class="puzzle-title">🔤 Maak de zin!</div>
+    <div class="puzzle-sub">Sleep de letters naar de juiste volgorde. Fout = 3 seconden tijdstraf.</div>
+  </div>
+  <div class="puzzle-body">
+    <div id="puzzle-penalty" class="puzzle-penalty"></div>
+    <div style="font-size:11px; letter-spacing:3px; text-transform:uppercase; color:var(--muted); margin-bottom:8px; text-align:center;">Jouw letters (willekeurige volgorde)</div>
+    <div class="puzzle-letters-pool" id="puzzle-pool"></div>
+    <div style="font-size:11px; letter-spacing:3px; text-transform:uppercase; color:var(--muted); margin-bottom:8px; text-align:center;">Sleep hier naar</div>
+    <div class="puzzle-slots" id="puzzle-slots"></div>
+    <div class="puzzle-score" id="puzzle-score"></div>
+  </div>
+</div>
+
 <!-- FINISH -->
 <div class="screen" id="screen-finish">
   <div class="trophy">🏆</div>
@@ -674,29 +812,37 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
 
 <script>
 // ── DEFAULT DATA ──────────────────────────────
+function makeStop(name, address, lat, lng, challenges) {
+  return { name:name, address:address, lat:lat, lng:lng, challenges:challenges };
+}
+function makeChallenge(clueTitle, challenge, par, photo, wildcard, letter, gifUrl) {
+  return { clueTitle:clueTitle, challenge:challenge, par:par, photo:!!photo, wildcard:!!wildcard, letter:letter||'', letterGifUrl:gifUrl||'' };
+}
+
 var DEFAULTS = {
   A: [
-    { name:"The Starting Tap",    address:"Leidseplein 12",           lat:52.3641, lng:4.8833, par:3, clueTitle:"Mime Bartender",        challenge:"Bestel alleen met handgebaren. Geen woorden!", photo:false, wildcard:false },
-    { name:"The Wobbly Windmill", address:"Rembrandtplein 5",         lat:52.3663, lng:4.8966, par:2, clueTitle:"Southpaw Challenge",    challenge:"Drink je drankje alleen met je niet-dominante hand.", photo:false, wildcard:true },
-    { name:"Canal House Bar",     address:"Herengracht 90",           lat:52.3738, lng:4.8877, par:4, clueTitle:"Compliment Machine",    challenge:"Elk slokje begint met een compliment aan een vreemde.", photo:false, wildcard:false },
-    { name:"The Red Tulip",       address:"Jordaan, Westerstraat 22", lat:52.3771, lng:4.8836, par:2, clueTitle:"Race the Playlist",     challenge:"Finish je drankje voor het volgende nummer afloopt.", photo:true,  wildcard:false },
-    { name:"Brew Corner",         address:"Nieuwmarkt 18",            lat:52.3726, lng:4.9003, par:3, clueTitle:"Sip & Sit",             challenge:"Je moet gaan zitten bij elke slok.", photo:false, wildcard:true },
-    { name:"The Dark Horse",      address:"Spuistraat 250",           lat:52.3721, lng:4.8885, par:2, clueTitle:"Bartender's Choice",    challenge:"Laat de barman een drankje kiezen. Drinken wat je krijgt.", photo:false, wildcard:false },
-    { name:"Final Hole Pub",      address:"Vijzelstraat 45",          lat:52.3602, lng:4.8950, par:1, clueTitle:"The Grand Finale",      challenge:"Leegdrinken in één keer. Geen pauze, geen handen.", photo:true,  wildcard:false },
-    { name:"Victory Lap",         address:"Vondelpark Cafe",          lat:52.3580, lng:4.8711, par:3, clueTitle:"Buy the Round",         challenge:"Bestel een rondje voor iedereen. Jij bent de held.", photo:false, wildcard:false }
+    makeStop("The Starting Tap",    "Leidseplein 12",           52.3641, 4.8833, [makeChallenge("Mime Bartender",     "Bestel alleen met handgebaren. Geen woorden!", 3, false, false, 'P', '')]),
+    makeStop("The Wobbly Windmill", "Rembrandtplein 5",         52.3663, 4.8966, [makeChallenge("Southpaw Challenge", "Drink je drankje alleen met je niet-dominante hand.", 2, false, true,  'U', '')]),
+    makeStop("Canal House Bar",     "Herengracht 90",           52.3738, 4.8877, [makeChallenge("Compliment Machine", "Elk slokje begint met een compliment aan een vreemde.", 4, false, false, 'B', '')]),
+    makeStop("The Red Tulip",       "Jordaan, Westerstraat 22", 52.3771, 4.8836, [makeChallenge("Race the Playlist",  "Finish je drankje voor het volgende nummer afloopt.", 2, true,  false, 'G', '')]),
+    makeStop("Brew Corner",         "Nieuwmarkt 18",            52.3726, 4.9003, [makeChallenge("Sip & Sit",          "Je moet gaan zitten bij elke slok.", 3, false, true,  'O', '')]),
+    makeStop("The Dark Horse",      "Spuistraat 250",           52.3721, 4.8885, [makeChallenge("Bartender's Choice", "Laat de barman een drankje kiezen. Drinken wat je krijgt.", 2, false, false, 'L', '')]),
+    makeStop("Final Hole Pub",      "Vijzelstraat 45",          52.3602, 4.8950, [makeChallenge("The Grand Finale",   "Leegdrinken in één keer. Geen pauze, geen handen.", 1, true,  false, 'F', '')]),
+    makeStop("Victory Lap",         "Vondelpark Cafe",          52.3580, 4.8711, [makeChallenge("Buy the Round",      "Bestel een rondje voor iedereen. Jij bent de held.", 3, false, false, '!', '')])
   ],
   B: [
-    { name:"The First Sip",       address:"Damrak 64",                lat:52.3737, lng:4.8952, par:3, clueTitle:"Laugh Tracker",         challenge:"Elke keer als iemand in de bar lacht, neem je een slok.", photo:false, wildcard:true },
-    { name:"Brouwerij Noord",     address:"Prinsengracht 438",        lat:52.3688, lng:4.8815, par:2, clueTitle:"Pinky Power",           challenge:"Drink alleen met je beide pinkvingers.", photo:false, wildcard:false },
-    { name:"The Iron Pint",       address:"Utrechtsestraat 33",       lat:52.3607, lng:4.9005, par:4, clueTitle:"Networking Hour",       challenge:"Voer een volledig gesprek met een vreemde voor je klaar bent.", photo:true,  wildcard:false },
-    { name:"Cafe De Gaper",       address:"Spuistraat 30",            lat:52.3734, lng:4.8903, par:2, clueTitle:"The Staredown",         challenge:"Drink terwijl je oogcontact houdt met een teamlid.", photo:false, wildcard:true },
-    { name:"Waterhole Bar",       address:"Korte Leidsedwarsstraat",  lat:52.3626, lng:4.8808, par:3, clueTitle:"International Drinker", challenge:"Elke slok moet gepaard gaan met een ander accent.", photo:false, wildcard:false },
-    { name:"Bitterzoet",          address:"Spuistraat 2",             lat:52.3745, lng:4.8907, par:2, clueTitle:"Count Your Crowd",      challenge:"Drink alleen als er een oneven aantal mensen binnen 5 meter zijn.", photo:false, wildcard:false },
-    { name:"The Tasting Room",    address:"Nes 37",                   lat:52.3712, lng:4.8969, par:1, clueTitle:"Drink Storyteller",     challenge:"Verzin een naam en verhaal voor je drankje. Vertel het aan de groep.", photo:true,  wildcard:false },
-    { name:"Club House",          address:"Amstel 54",                lat:52.3656, lng:4.9010, par:3, clueTitle:"Victory Dance",         challenge:"Doe een overwinningsdans na het drinken. De groep geeft een cijfer.", photo:false, wildcard:true }
+    makeStop("The First Sip",       "Damrak 64",                52.3737, 4.8952, [makeChallenge("Laugh Tracker",      "Elke keer als iemand in de bar lacht, neem je een slok.", 3, false, true,  'P', '')]),
+    makeStop("Brouwerij Noord",     "Prinsengracht 438",        52.3688, 4.8815, [makeChallenge("Pinky Power",        "Drink alleen met je beide pinkvingers.", 2, false, false, 'U', '')]),
+    makeStop("The Iron Pint",       "Utrechtsestraat 33",       52.3607, 4.9005, [makeChallenge("Networking Hour",    "Voer een volledig gesprek met een vreemde voor je klaar bent.", 4, true,  false, 'B', '')]),
+    makeStop("Cafe De Gaper",       "Spuistraat 30",            52.3734, 4.8903, [makeChallenge("The Staredown",      "Drink terwijl je oogcontact houdt met een teamlid.", 2, false, true,  'G', '')]),
+    makeStop("Waterhole Bar",       "Korte Leidsedwarsstraat",  52.3626, 4.8808, [makeChallenge("International Drinker","Elke slok moet gepaard gaan met een ander accent.", 3, false, false, 'O', '')]),
+    makeStop("Bitterzoet",          "Spuistraat 2",             52.3745, 4.8907, [makeChallenge("Count Your Crowd",   "Drink alleen als er een oneven aantal mensen binnen 5 meter zijn.", 2, false, false, 'L', '')]),
+    makeStop("The Tasting Room",    "Nes 37",                   52.3712, 4.8969, [makeChallenge("Drink Storyteller",  "Verzin een naam en verhaal voor je drankje. Vertel het aan de groep.", 1, true,  false, 'F', '')]),
+    makeStop("Club House",          "Amstel 54",                52.3656, 4.9010, [makeChallenge("Victory Dance",      "Doe een overwinningsdans na het drinken. De groep geeft een cijfer.", 3, false, true,  '!', '')])
   ],
   nameA: 'Team A',
   nameB: 'Team B',
+  refereeCode: '',
   wildcards: [
     "Drink je glas omhoog houdend met gestrekte arm",
     "Wissel glas met de persoon naast je",
@@ -717,10 +863,28 @@ var DEFAULTS = {
   }
 };
 
+// ── MIGRATION ─────────────────────────────────
+function migrateCourse(c) {
+  if (!c) return clone(DEFAULTS);
+  ['A','B'].forEach(function(g) {
+    if (!Array.isArray(c[g])) return;
+    c[g] = c[g].map(function(s) {
+      if (s.challenges) return s;
+      return { name:s.name, address:s.address, lat:s.lat, lng:s.lng,
+        challenges:[{ clueTitle:s.clueTitle||'', challenge:s.challenge||'', par:s.par||2,
+          photo:!!s.photo, wildcard:!!s.wildcard, letter:'', letterGifUrl:'' }] };
+    });
+  });
+  if (!c.refereeCode) c.refereeCode = '';
+  return c;
+}
+
 // ── STATE ─────────────────────────────────────
-var course = JSON.parse(localStorage.getItem('pg_course') || 'null') || clone(DEFAULTS);
+var course = migrateCourse(JSON.parse(localStorage.getItem('pg_course') || 'null'));
 var group = 'A';
 var stopIdx = 0;
+var challengeIdx = 0;
+var earnedLetters = [];
 var scores = [];
 var photos = {};
 var pickedScore = null;
@@ -731,6 +895,9 @@ var bonusInserted = false;
 var bonusPending = false;
 var map = null, playerMarker = null, destMarker = null, routeLine = null;
 var lastPos = null;
+var isReferee = false;
+var refereeGroup = null;
+var refereeStateRef = null;
 
 // session
 var sessionCode = null;
@@ -751,12 +918,15 @@ function goHome() { show('screen-intro'); }
 function chooseGroup(g) {
   group = g;
   stopIdx = 0;
+  challengeIdx = 0;
+  earnedLetters = [];
   scores = [];
   photos = {};
   pickedScore = null;
   arrived = false;
   bonusInserted = false;
   bonusPending = false;
+  isReferee = false;
   startGame();
 }
 
@@ -781,11 +951,23 @@ function closeEditor() {
 
 function getStops() { return course[group]; }
 
+function currentChallenge() {
+  var s = getStops()[stopIdx];
+  if (!s) return null;
+  var chs = s.challenges || [];
+  return chs[challengeIdx] || chs[0] || null;
+}
+
 function renderStop() {
   var stops = getStops();
   var s = stops[stopIdx];
-  document.getElementById('hole-label').textContent = 'HOLE ' + (stopIdx+1) + ' / ' + stops.length;
-  document.getElementById('par-val').textContent = s.par;
+  var ch = currentChallenge();
+  var totalCh = (s.challenges || []).length;
+
+  document.getElementById('hole-label').textContent =
+    'HOLE ' + (stopIdx+1) + ' / ' + stops.length +
+    (totalCh > 1 ? '  ·  Challenge ' + (challengeIdx+1) + '/' + totalCh : '');
+  document.getElementById('par-val').textContent = ch ? ch.par : s.par || '—';
   document.getElementById('stop-name').textContent = s.name;
   document.getElementById('stop-addr').textContent = s.address;
   document.getElementById('hdr-score').textContent = scores.reduce(function(a,b){return a+b;},0);
@@ -794,21 +976,19 @@ function renderStop() {
   var bb = document.getElementById('bonus-badge');
   if (s._bonus) bb.classList.add('visible'); else bb.classList.remove('visible');
 
-  // travel time (reset — will update on GPS)
-  var tt = document.getElementById('travel-time');
-  tt.style.display = 'none';
+  // travel time reset
+  document.getElementById('travel-time').style.display = 'none';
 
-  // wildcard: show before arrival
+  // wildcard from current challenge
   var wc = document.getElementById('wildcard-banner');
-  if (s.wildcard && course.wildcards && course.wildcards.length > 0) {
-    var wcText = course.wildcards[Math.floor(Math.random() * course.wildcards.length)];
-    document.getElementById('wildcard-text').textContent = wcText;
+  if (ch && ch.wildcard && course.wildcards && course.wildcards.length > 0) {
+    document.getElementById('wildcard-text').textContent = course.wildcards[Math.floor(Math.random() * course.wildcards.length)];
     wc.classList.add('visible');
   } else {
     wc.classList.remove('visible');
   }
 
-  // reset
+  // reset UI
   document.getElementById('dist-num').textContent = '—';
   document.getElementById('dist-num').className = 'dist-num';
   document.getElementById('dist-sub').textContent = 'searching gps…';
@@ -816,6 +996,7 @@ function renderStop() {
   document.getElementById('compass').style.transform = '';
   document.getElementById('clue-locked').classList.remove('hidden');
   document.getElementById('clue-open').classList.remove('visible');
+  document.getElementById('btn-challenge-done').style.display = 'none';
   document.getElementById('btn-log').classList.remove('visible');
   document.getElementById('score-area').classList.remove('visible');
   document.getElementById('photo-section').classList.remove('visible');
@@ -841,14 +1022,16 @@ function renderScorecard() {
     var sc = scores[i] !== undefined ? scores[i] : '—';
     var diff = '';
     if (scores[i] !== undefined) {
-      var d = scores[i] - s.par;
+      var sPar = s.challenges ? s.challenges[0].par : (s.par || 2);
+      var d = scores[i] - sPar;
       diff = d > 0 ? '+'+d : d === 0 ? 'par' : String(d);
     }
+    var sPar0 = s.challenges ? s.challenges[0].par : (s.par || 2);
     var icon = i < stopIdx ? '✓' : s._bonus ? '⭐' : String(i+1);
     row.innerHTML =
       '<div class="sc-num">' + icon + '</div>' +
       '<div class="sc-info"><div class="sc-name">' + s.name + '</div>' +
-      '<div class="sc-sub">Par ' + s.par + (diff ? ' · '+diff : '') + (s._bonus ? ' · bonus' : '') + '</div></div>' +
+      '<div class="sc-sub">Par ' + sPar0 + (diff ? ' · '+diff : '') + (s._bonus ? ' · bonus' : '') + '</div></div>' +
       '<div class="sc-score">' + sc + '</div>';
     box.appendChild(row);
   });
@@ -944,7 +1127,21 @@ function onPosition(pos) {
   var heading = pos.coords.heading; // degrees from north, null if stationary
   updateMapPlayer(pos.coords.latitude, pos.coords.longitude, s.lat, s.lng, heading);
   pushLocation(pos.coords.latitude, pos.coords.longitude);
-  if (!arrived && dist < 80) { arrived = true; unlockClue(s); }
+  if (!arrived && dist < 80) { arrived = true; unlockClue(s); checkProximityWildcards(); }
+}
+
+function checkProximityWildcards() {
+  // Find any challenge (other stops) whose wildcard is mapped to proximity at current stopIdx
+  var stops = getStops();
+  stops.forEach(function(st) {
+    (st.challenges || []).forEach(function(ch) {
+      if (ch.wildcard && ch.wildcardTriggerAtStop === stopIdx && course.wildcards && course.wildcards.length > 0) {
+        // Show a random wildcard from the pool
+        var wc = course.wildcards[Math.floor(Math.random() * course.wildcards.length)];
+        toast('🃏 Wildcard: ' + wc);
+      }
+    });
+  });
 }
 
 function updateDist(dist, bear) {
@@ -1198,6 +1395,189 @@ function updateMapPeer(lat, lng, theirG) {
 function stopSync() {
   if (peerRef) { peerRef.off(); peerRef = null; }
   if (myRef) { myRef.onDisconnect().cancel(); myRef.remove(); myRef = null; }
+  if (refereeStateRef) { refereeStateRef.off(); refereeStateRef = null; }
+}
+
+// ── REFEREE FIREBASE STATE ─────────────────────
+function pushChallengeState(status) {
+  if (!sessionCode) return;
+  var db = getFirebase(); if (!db) return;
+  db.ref('sessions/' + sessionCode + '/state/' + group).set({
+    stopIdx: stopIdx,
+    challengeIdx: challengeIdx,
+    status: status,
+    earnedLetters: earnedLetters,
+    stopName: getStops()[stopIdx] ? getStops()[stopIdx].name : '',
+    ts: Date.now()
+  });
+}
+
+function listenForRefereeApproval() {
+  if (!sessionCode) return;
+  var db = getFirebase(); if (!db) return;
+  var ref = db.ref('sessions/' + sessionCode + '/state/' + group);
+  ref.on('value', function(snap) {
+    var d = snap.val();
+    if (!d) return;
+    if (d.status === 'approved') {
+      document.getElementById('pending-overlay').classList.remove('show');
+      ref.off();
+      // show letter reveal if letters awarded
+      var letters = d.awardedLetters || [];
+      earnedLetters = d.earnedLetters || earnedLetters;
+      if (letters.length > 0) {
+        var ch = currentChallenge();
+        var gif = ch ? ch.letterGifUrl : '';
+        var i = 0;
+        function revealNext() {
+          if (i < letters.length) {
+            showLetterReveal(letters[i], gif, function() { i++; revealNext(); });
+          } else {
+            advanceChallenge();
+          }
+        }
+        revealNext();
+      } else {
+        advanceChallenge();
+      }
+    } else if (d.status === 'rejected') {
+      document.getElementById('pending-overlay').classList.remove('show');
+      ref.off();
+      toast('❌ Challenge afgekeurd — probeer opnieuw');
+      document.getElementById('btn-challenge-done').style.display = 'block';
+    }
+  });
+}
+
+// ── REFEREE MODE ───────────────────────────────
+function enterRefereeMode() {
+  var input = document.getElementById('referee-code-input').value.trim().toUpperCase();
+  if (!input) { toast('Voer de scheidsrechter-code in'); return; }
+  if (!course.refereeCode || input !== course.refereeCode.toUpperCase()) {
+    toast('❌ Verkeerde code'); return;
+  }
+  openNameModal('Welk team begeleid je?', function(teamName) {
+    // use teamName as hint but ask group
+    openRefGroupSelect();
+  });
+}
+
+function openRefGroupSelect() {
+  var nameA = course.nameA || 'Team A';
+  var nameB = course.nameB || 'Team B';
+  openNameModal('Typ A of B', function(val) {
+    val = (val || '').toUpperCase().trim();
+    if (val !== 'A' && val !== 'B') { toast('Typ A of B'); return; }
+    isReferee = true;
+    refereeGroup = val;
+    startRefereeView();
+  });
+}
+
+function startRefereeView() {
+  document.getElementById('referee-team-label').textContent =
+    '👥 ' + (refereeGroup === 'A' ? (course.nameA || 'Team A') : (course.nameB || 'Team B'));
+  show('screen-referee');
+  listenRefereeState();
+}
+
+function listenRefereeState() {
+  if (!sessionCode) return;
+  var db = getFirebase(); if (!db) return;
+  if (refereeStateRef) refereeStateRef.off();
+  refereeStateRef = db.ref('sessions/' + sessionCode + '/state/' + refereeGroup);
+  refereeStateRef.on('value', function(snap) {
+    var d = snap.val();
+    renderRefereeView(d);
+  });
+}
+
+function renderRefereeView(d) {
+  var stops = course[refereeGroup] || [];
+  var si = d ? d.stopIdx : 0;
+  var ci = d ? d.challengeIdx : 0;
+  var status = d ? d.status : 'waiting';
+  var stop = stops[si];
+  var ch = stop && stop.challenges ? stop.challenges[ci] : null;
+  var letters = earnedLettersForGroup(d);
+
+  document.getElementById('ref-hole-label').textContent = 'HOLE ' + (si+1) + ' / ' + stops.length;
+  document.getElementById('ref-stop-name').textContent = stop ? stop.name : '—';
+  document.getElementById('ref-challenge-num').textContent =
+    stop && stop.challenges && stop.challenges.length > 1
+      ? 'Challenge ' + (ci+1) + ' van ' + stop.challenges.length : '';
+  document.getElementById('ref-clue-title').textContent = ch ? ch.clueTitle : '—';
+  document.getElementById('ref-clue-body').textContent = ch ? ch.challenge : '—';
+
+  // earned letters strip
+  var strip = document.getElementById('ref-earned-letters');
+  strip.innerHTML = (d && d.earnedLetters || []).map(function(l) {
+    return '<div class="earned-letter-chip">' + l + '</div>';
+  }).join('');
+
+  // status + approve panel
+  var statusEl = document.getElementById('referee-status');
+  var panel = document.getElementById('referee-approve-panel');
+  var row = document.getElementById('letter-award-row');
+
+  if (status === 'pending') {
+    statusEl.className = 'referee-status pending';
+    statusEl.textContent = '⚡ Team klaar! Beoordeel nu';
+    panel.style.display = 'block';
+    // build letter chips for this challenge
+    row.innerHTML = '';
+    var availLetters = ch && ch.letter ? ch.letter.split('') : [];
+    // also allow multi-challenge letters
+    if (stop && stop.challenges) {
+      stop.challenges.forEach(function(c, i) {
+        if (c.letter) availLetters = availLetters.concat(c.letter.split(''));
+      });
+    }
+    // deduplicate
+    var seen = {};
+    availLetters = availLetters.filter(function(l) { if (seen[l]) return false; seen[l] = true; return true; });
+    availLetters.forEach(function(l) {
+      var chip = document.createElement('div');
+      chip.className = 'letter-award-chip';
+      chip.textContent = l;
+      chip.dataset.letter = l;
+      chip.onclick = function() { chip.classList.toggle('sel'); };
+      row.appendChild(chip);
+    });
+  } else {
+    statusEl.className = 'referee-status waiting';
+    statusEl.textContent = status === 'approved' ? '✓ Goedgekeurd' : status === 'rejected' ? '✕ Afgekeurd' : 'Wachten op team…';
+    panel.style.display = 'none';
+  }
+}
+
+function earnedLettersForGroup(d) {
+  return d && d.earnedLetters ? d.earnedLetters : [];
+}
+
+function refereeApprove() {
+  var db = getFirebase(); if (!db || !sessionCode) return;
+  var selected = [];
+  document.querySelectorAll('#letter-award-row .letter-award-chip.sel').forEach(function(c) {
+    selected.push(c.dataset.letter);
+  });
+  var ref = db.ref('sessions/' + sessionCode + '/state/' + refereeGroup);
+  ref.once('value').then(function(snap) {
+    var d = snap.val() || {};
+    var existing = d.earnedLetters || [];
+    ref.update({
+      status: 'approved',
+      awardedLetters: selected,
+      earnedLetters: existing.concat(selected)
+    });
+    toast('✅ Goedgekeurd' + (selected.length ? ' · ' + selected.join('') : ''));
+  });
+}
+
+function refereeReject() {
+  var db = getFirebase(); if (!db || !sessionCode) return;
+  db.ref('sessions/' + sessionCode + '/state/' + refereeGroup).update({ status: 'rejected' });
+  toast('❌ Afgekeurd');
 }
 
 // ── ALARM + VIBRATION ─────────────────────────
@@ -1236,8 +1616,7 @@ function triggerArrivalAlarm() {
 // ── CLUE REVEAL ANIMATION ─────────────────────
 function unlockClue(s) {
   triggerArrivalAlarm();
-
-  // shake the lock first, then reveal
+  var ch = currentChallenge();
   var locked = document.getElementById('clue-locked');
   locked.classList.add('shake');
   setTimeout(function() {
@@ -1248,19 +1627,28 @@ function unlockClue(s) {
     open.classList.remove('animate');
     void open.offsetWidth;
     open.classList.add('animate');
-    document.getElementById('clue-title').textContent = s.clueTitle;
-    document.getElementById('clue-body').textContent = s.challenge;
-    document.getElementById('clue-par').textContent = s.par;
+    document.getElementById('clue-title').textContent = ch ? ch.clueTitle : s.clueTitle || '—';
+    document.getElementById('clue-body').textContent = ch ? ch.challenge : s.challenge || '—';
+    document.getElementById('clue-par').textContent = ch ? ch.par : s.par || '—';
 
-    if (s.photo) {
+    if (ch && ch.photo) {
       document.getElementById('photo-section').classList.add('visible');
       document.getElementById('photo-required-note').style.display = 'block';
-      if (photos[stopIdx]) {
-        document.getElementById('photo-img').src = photos[stopIdx];
+      var photoKey = stopIdx + '-' + challengeIdx;
+      if (photos[photoKey]) {
+        document.getElementById('photo-img').src = photos[photoKey];
         document.getElementById('photo-preview').classList.add('has-photo');
       }
     }
-    document.getElementById('btn-log').classList.add('visible');
+
+    // Show "Challenge klaar!" if session active (referee flow), else go direct to score
+    if (sessionCode && course.refereeCode) {
+      document.getElementById('btn-challenge-done').style.display = 'block';
+    } else {
+      var allDone = !s.challenges || challengeIdx >= s.challenges.length - 1;
+      if (allDone) document.getElementById('btn-log').classList.add('visible');
+      else document.getElementById('btn-challenge-done').style.display = 'block';
+    }
     toast('🔓 Clue vrijgegeven bij ' + s.name + '!');
   }, 400);
 }
@@ -1273,7 +1661,8 @@ function openCamera() {
     if (!input.files || !input.files[0]) return;
     var reader = new FileReader();
     reader.onload = function(e) {
-      photos[stopIdx] = e.target.result;
+      var key = stopIdx + '-' + challengeIdx;
+      photos[key] = e.target.result;
       document.getElementById('photo-img').src = e.target.result;
       document.getElementById('photo-preview').classList.add('has-photo');
       document.getElementById('photo-required-note').style.display = 'none';
@@ -1285,37 +1674,106 @@ function openCamera() {
 }
 
 function downloadCurrentPhoto() {
-  var d = photos[stopIdx]; if (!d) return;
+  var key = stopIdx + '-' + challengeIdx;
+  var d = photos[key]; if (!d) return;
   var a = document.createElement('a');
   a.href = d;
   a.download = 'pubgolf_' + getStops()[stopIdx].name.replace(/\s+/g,'_') + '.jpg';
   a.click();
 }
 
-function downloadStripPhoto(idx) {
-  var d = photos[idx]; if (!d) return;
+function downloadStripPhoto(key) {
+  var d = photos[key]; if (!d) return;
+  var parts = String(key).split('-');
+  var si = parseInt(parts[0]);
   var a = document.createElement('a');
   a.href = d;
-  a.download = 'pubgolf_' + getStops()[idx].name.replace(/\s+/g,'_') + '.jpg';
+  a.download = 'pubgolf_' + (getStops()[si] ? getStops()[si].name.replace(/\s+/g,'_') : key) + '.jpg';
   a.click();
 }
 
 // ── SCORING ───────────────────────────────────
+function markChallengeDone() {
+  var s = getStops()[stopIdx];
+  var ch = currentChallenge();
+  var key = stopIdx + '-' + challengeIdx;
+  if (ch && ch.photo && !photos[key]) {
+    toast('📸 Maak eerst een groepsfoto!');
+    document.getElementById('photo-required-note').style.display = 'block';
+    return;
+  }
+  document.getElementById('btn-challenge-done').style.display = 'none';
+  if (sessionCode && course.refereeCode) {
+    // referee flow: set pending, show spinner, listen for approval
+    document.getElementById('pending-overlay').classList.add('show');
+    pushChallengeState('pending');
+    listenForRefereeApproval();
+  } else {
+    // no referee: award letter directly and advance challenge
+    var letter = ch ? ch.letter : '';
+    var gif = ch ? ch.letterGifUrl : '';
+    if (letter) {
+      showLetterReveal(letter, gif, function() { advanceChallenge(); });
+    } else {
+      advanceChallenge();
+    }
+  }
+}
+
+function advanceChallenge() {
+  var s = getStops()[stopIdx];
+  var totalCh = (s.challenges || []).length;
+  if (challengeIdx < totalCh - 1) {
+    challengeIdx++;
+    // re-show clue for next challenge (already arrived)
+    document.getElementById('clue-open').classList.remove('visible', 'animate');
+    document.getElementById('clue-locked').classList.remove('hidden');
+    setTimeout(function() { unlockClue(s); }, 300);
+    renderStop();
+  } else {
+    // all challenges done, now enter score
+    document.getElementById('btn-log').classList.add('visible');
+  }
+}
+
+function showLetterReveal(letter, gifUrl, cb) {
+  var el = document.getElementById('letter-reveal');
+  var img = document.getElementById('letter-reveal-gif');
+  var prog = document.getElementById('letter-reveal-progress');
+  document.getElementById('letter-reveal-letter').textContent = letter;
+  earnedLetters.push(letter);
+  if (gifUrl) { img.src = gifUrl; img.style.display = 'block'; }
+  else { img.style.display = 'none'; }
+  el.classList.add('show');
+  prog.style.transition = 'none';
+  prog.style.width = '100%';
+  setTimeout(function() {
+    prog.style.transition = 'width 10s linear';
+    prog.style.width = '0%';
+  }, 50);
+  setTimeout(function() {
+    el.classList.remove('show');
+    if (cb) cb();
+  }, 10000);
+}
+
 function showScoreArea() {
   var s = getStops()[stopIdx];
-  // photo required check
-  if (s.photo && !photos[stopIdx]) {
+  var ch = currentChallenge();
+  var key = stopIdx + '-' + challengeIdx;
+  if (ch && ch.photo && !photos[key]) {
     toast('📸 Maak eerst een groepsfoto!');
     document.getElementById('photo-required-note').style.display = 'block';
     return;
   }
   var grid = document.getElementById('score-grid');
   grid.innerHTML = '';
-  for (var n = 1; n <= s.par + 3; n++) {
+  var sPar = s.challenges ? s.challenges[0].par : (s.par || 2);
+  for (var n = 1; n <= sPar + 3; n++) {
     (function(num) {
       var chip = document.createElement('button');
       chip.className = 'score-chip';
-      var d = num - s.par;
+      var d = num - sPar;
       chip.innerHTML = num + '<sub>' + (d===0?'par':d>0?'+'+d:d) + '</sub>';
       chip.onclick = function() {
         document.querySelectorAll('.score-chip').forEach(function(c){c.classList.remove('selected');});
@@ -1353,7 +1811,8 @@ function confirmScore() {
 function acceptBonus() {
   // Insert bonus stop after current position
   var bonus = course.bonus;
-  var bonusStop = { name: bonus.name, address: bonus.address, lat: bonus.lat, lng: bonus.lng, par: bonus.par, clueTitle: '⭐ Bonus Challenge', challenge: bonus.challenge, photo: false, wildcard: false, _bonus: true };
+  var bonusStop = { name: bonus.name, address: bonus.address, lat: bonus.lat, lng: bonus.lng, _bonus: true,
+    challenges: [{ clueTitle: '⭐ Bonus Challenge', challenge: bonus.challenge, par: bonus.par || 2, photo: false, wildcard: false, letter: '', letterGifUrl: '' }] };
   course[group].splice(stopIdx, 0, bonusStop);
   bonusInserted = true;
   bonusPending = false;
@@ -1369,7 +1828,11 @@ function skipBonus() {
 }
 
 function advanceStop() {
-  if (stopIdx >= getStops().length) { finishGame(); return; }
+  challengeIdx = 0;
+  if (stopIdx >= getStops().length) {
+    if (earnedLetters.length > 1) { openPuzzle(); } else { finishGame(); }
+    return;
+  }
   renderStop();
   renderScorecard();
   toast('✓ Hole gedaan! Volgende: hole ' + (stopIdx+1));
@@ -1381,12 +1844,13 @@ function finishGame() {
   stopSync();
   var stops = getStops();
   var total = scores.reduce(function(a,b){return a+b;},0);
-  var par = stops.reduce(function(a,s){return a+s.par;},0);
+  var par = stops.reduce(function(a,s){ return a + (s.challenges ? s.challenges[0].par : (s.par||2)); }, 0);
   var d = total - par;
   document.getElementById('finish-sub').textContent = (group === 'A' ? (course.nameA||'Team A') : (course.nameB||'Team B')) + ' · ' + (d>0?'+'+d:d===0?'gelijk aan par':String(d)) + ' vs par';
   document.getElementById('final-num').textContent = total;
   document.getElementById('final-rows').innerHTML = stops.map(function(s,i){
-    return '<div class="final-row"><span>' + (s._bonus?'⭐ ':'')+s.name+'</span><span>'+(scores[i]!==undefined?scores[i]:'—')+' / par '+s.par+'</span></div>';
+    var sp = s.challenges ? s.challenges[0].par : (s.par||2);
+    return '<div class="final-row"><span>' + (s._bonus?'⭐ ':'')+s.name+'</span><span>'+(scores[i]!==undefined?scores[i]:'—')+' / par '+sp+'</span></div>';
   }).join('');
 
   // photo strip
@@ -1395,14 +1859,16 @@ function finishGame() {
     document.getElementById('photo-strip-wrap').style.display = 'block';
     var strip = document.getElementById('photo-strip');
     strip.innerHTML = '';
-    keys.forEach(function(idx) {
-      var stopName = stops[idx] ? stops[idx].name : 'Hole '+(parseInt(idx)+1);
+    keys.forEach(function(key) {
+      var parts = key.split('-');
+      var si = parseInt(parts[0]);
+      var stopName = stops[si] ? stops[si].name : 'Hole '+(si+1);
       var frame = document.createElement('div');
       frame.className = 'strip-frame';
       frame.innerHTML =
-        '<img src="'+photos[idx]+'" alt="'+stopName+'">' +
+        '<img src="'+photos[key]+'" alt="'+stopName+'">' +
         '<div class="strip-frame-label">'+stopName+'</div>' +
-        '<button class="strip-dl" onclick="downloadStripPhoto('+idx+')">⬇ opslaan</button>';
+        '<button class="strip-dl" onclick="downloadStripPhoto(\''+key+'\')">⬇ opslaan</button>';
       strip.appendChild(frame);
     });
   } else {
@@ -1413,6 +1879,156 @@ function finishGame() {
 }
 
 function restart() { stopGPS(); stopSync(); photos = {}; sessionCode = null; playerId = null; show('screen-intro'); }
+
+// ── PUZZLE ────────────────────────────────────
+var puzzleAnswer = [];    // correct letter order
+var puzzleSlotFilled = []; // letter placed in each slot (or null)
+var puzzlePenaltyTime = 0;
+var puzzlePenaltyTimer = null;
+
+function openPuzzle() {
+  // Shuffle earnedLetters for display in pool
+  var letters = earnedLetters.slice();
+  // Fisher-Yates shuffle
+  for (var i = letters.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var tmp = letters[i]; letters[i] = letters[j]; letters[j] = tmp;
+  }
+  puzzleAnswer = earnedLetters.slice(); // correct order = order they were earned
+  puzzleSlotFilled = puzzleAnswer.map(function() { return null; });
+
+  var pool = document.getElementById('puzzle-pool');
+  var slots = document.getElementById('puzzle-slots');
+  pool.innerHTML = '';
+  slots.innerHTML = '';
+  document.getElementById('puzzle-penalty').textContent = '';
+  document.getElementById('puzzle-score').textContent = '';
+
+  letters.forEach(function(letter, i) {
+    var tile = document.createElement('div');
+    tile.className = 'puzzle-letter';
+    tile.textContent = letter;
+    tile.dataset.letter = letter;
+    tile.dataset.poolIdx = i;
+    tile.setAttribute('draggable', 'true');
+    addDragToTile(tile);
+    pool.appendChild(tile);
+  });
+
+  puzzleAnswer.forEach(function(letter, si) {
+    var slot = document.createElement('div');
+    slot.className = 'puzzle-slot';
+    slot.dataset.slotIdx = si;
+    slot.dataset.answer = letter;
+    slot.textContent = '?';
+    addDropToSlot(slot);
+    slots.appendChild(slot);
+  });
+
+  show('screen-puzzle');
+}
+
+function addDragToTile(tile) {
+  // Mouse drag
+  tile.addEventListener('dragstart', function(e) {
+    e.dataTransfer.setData('text/plain', tile.dataset.poolIdx);
+    tile.classList.add('dragging');
+  });
+  tile.addEventListener('dragend', function() { tile.classList.remove('dragging'); });
+
+  // Touch drag
+  tile.addEventListener('touchstart', function(e) {
+    var t = e.touches[0];
+    tile._touchOffX = t.clientX - tile.getBoundingClientRect().left;
+    tile._touchOffY = t.clientY - tile.getBoundingClientRect().top;
+    tile._dragging = true;
+    tile.classList.add('dragging');
+    e.preventDefault();
+  }, { passive: false });
+  tile.addEventListener('touchmove', function(e) {
+    if (!tile._dragging) return;
+    var t = e.touches[0];
+    tile.style.position = 'fixed';
+    tile.style.zIndex = 9999;
+    tile.style.left = (t.clientX - tile._touchOffX) + 'px';
+    tile.style.top  = (t.clientY - tile._touchOffY) + 'px';
+    e.preventDefault();
+  }, { passive: false });
+  tile.addEventListener('touchend', function(e) {
+    tile._dragging = false;
+    tile.classList.remove('dragging');
+    tile.style.position = '';
+    tile.style.zIndex = '';
+    tile.style.left = '';
+    tile.style.top = '';
+    var t = e.changedTouches[0];
+    var el = document.elementFromPoint(t.clientX, t.clientY);
+    while (el && !el.classList.contains('puzzle-slot')) el = el.parentElement;
+    if (el) dropOnSlot(el, tile);
+  });
+}
+
+function addDropToSlot(slot) {
+  slot.addEventListener('dragover', function(e) { e.preventDefault(); slot.style.borderColor = 'var(--gold)'; });
+  slot.addEventListener('dragleave', function() { slot.style.borderColor = ''; });
+  slot.addEventListener('drop', function(e) {
+    e.preventDefault();
+    slot.style.borderColor = '';
+    var poolIdx = e.dataTransfer.getData('text/plain');
+    var tile = document.querySelector('.puzzle-letter[data-pool-idx="' + poolIdx + '"]');
+    if (tile) dropOnSlot(slot, tile);
+  });
+}
+
+function dropOnSlot(slot, tile) {
+  var si = parseInt(slot.dataset.slotIdx);
+  var correct = slot.dataset.answer;
+  var letter = tile.dataset.letter;
+
+  if (letter === correct) {
+    slot.textContent = letter;
+    slot.className = 'puzzle-slot correct';
+    tile.classList.add('placed');
+    puzzleSlotFilled[si] = letter;
+    checkPuzzleWin();
+  } else {
+    slot.className = 'puzzle-slot wrong';
+    applyPuzzlePenalty();
+    setTimeout(function() {
+      if (!slot.classList.contains('correct')) slot.className = 'puzzle-slot';
+    }, 500);
+  }
+}
+
+function applyPuzzlePenalty() {
+  puzzlePenaltyTime += 3;
+  if (puzzlePenaltyTimer) clearInterval(puzzlePenaltyTimer);
+  updatePenaltyDisplay();
+  puzzlePenaltyTimer = setInterval(function() {
+    puzzlePenaltyTime--;
+    if (puzzlePenaltyTime <= 0) {
+      puzzlePenaltyTime = 0;
+      clearInterval(puzzlePenaltyTimer);
+      document.getElementById('puzzle-penalty').textContent = '';
+    } else {
+      updatePenaltyDisplay();
+    }
+  }, 1000);
+}
+
+function updatePenaltyDisplay() {
+  document.getElementById('puzzle-penalty').textContent = '⏱ +' + puzzlePenaltyTime + 's tijdstraf';
+}
+
+function checkPuzzleWin() {
+  var allCorrect = puzzleSlotFilled.every(function(l, i) { return l === puzzleAnswer[i]; });
+  if (allCorrect) {
+    clearInterval(puzzlePenaltyTimer);
+    var sentence = puzzleAnswer.join('');
+    document.getElementById('puzzle-score').textContent = '🎉 Gelukt! "' + sentence + '"';
+    setTimeout(function() { finishGame(); }, 2000);
+  }
+}
 
 // ── TOAST ─────────────────────────────────────
 var toastTimer = null;
@@ -1445,6 +2061,7 @@ function openEditor() {
     : 'Configureer stops, wildcards en de geheime bonus hole.';
   document.getElementById('team-name-a').value = course.nameA || 'Team A';
   document.getElementById('team-name-b').value = course.nameB || 'Team B';
+  document.getElementById('referee-code').value = course.refereeCode || '';
   renderEditor('A'); renderEditor('B');
   renderWildcardEditor('mobile'); renderWildcardEditor('desktop');
   renderBonusEditor('mobile'); renderBonusEditor('desktop');
@@ -1481,11 +2098,30 @@ function renderEditor(g) {
     if (!box) return;
     box.innerHTML = '';
     course[g].forEach(function(s, i) {
+      var chs = s.challenges || [];
+      var challengeHtml = chs.map(function(ch, ci) {
+        return '<div class="challenge-sub-block">' +
+          '<div class="challenge-sub-head">' +
+            '<div class="challenge-sub-num">Challenge '+(ci+1)+'</div>' +
+            (chs.length > 1 ? '<button class="btn-remove-challenge" onclick="removeChallenge(\''+g+'\','+i+','+ci+')">✕</button>' : '') +
+          '</div>' +
+          '<div class="stop-fields-grid">' +
+            '<div class="field"><label>Titel</label><input type="text" id="f-'+g+'-'+i+'-'+ci+'-clueTitle" value="'+safeVal(ch.clueTitle)+'"></div>' +
+            '<div class="field"><label>Letter</label><input type="text" id="f-'+g+'-'+i+'-'+ci+'-letter" maxlength="1" value="'+safeVal(ch.letter)+'" style="text-transform:uppercase;"></div>' +
+            '<div class="field full"><label>Challenge omschrijving</label><textarea id="f-'+g+'-'+i+'-'+ci+'-challenge">'+safeText(ch.challenge)+'</textarea></div>' +
+            '<div class="field full"><label>Letter GIF URL</label><input type="text" id="f-'+g+'-'+i+'-'+ci+'-gifUrl" value="'+safeVal(ch.letterGifUrl)+'" placeholder="https://...gif"></div>' +
+            '<div class="field"><label>Par</label><input type="number" min="1" max="9" id="f-'+g+'-'+i+'-'+ci+'-par" value="'+(ch.par||2)+'"></div>' +
+            '<div class="field"><div class="photo-toggle-row"><span class="photo-toggle-label">📸 Foto</span><label class="toggle-switch"><input type="checkbox" id="f-'+g+'-'+i+'-'+ci+'-photo"'+(ch.photo?' checked':'')+'><span class="toggle-track"></span></label></div></div>' +
+            '<div class="field"><div class="wildcard-toggle-row"><span class="wildcard-toggle-label">🃏 Wildcard</span><label class="toggle-switch"><input type="checkbox" id="f-'+g+'-'+i+'-'+ci+'-wildcard"'+(ch.wildcard?' checked':'')+'><span class="toggle-track"></span></label></div></div>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+
       var d = document.createElement('div');
       d.className = 'stop-block';
       d.innerHTML =
         '<div class="stop-block-head"><div class="stop-block-num">HOLE '+(i+1)+'</div>' +
-        '<button class="btn-remove" onclick="removeStop(\''+g+'\','+i+')">Verwijder</button></div>' +
+        '<button class="btn-remove" onclick="removeStop(\''+g+'\','+i+')">Verwijder stop</button></div>' +
         '<div class="stop-fields-grid">' +
           '<div class="field"><label>Naam</label><input type="text" id="f-'+g+'-'+i+'-name" value="'+safeVal(s.name)+'"></div>' +
           '<div class="field full"><label>Adres</label><div style="display:flex; gap:8px;">' +
@@ -1494,18 +2130,9 @@ function renderEditor(g) {
           '</div></div>' +
           '<div class="field"><label>Latitude</label><input type="number" step="0.000001" id="f-'+g+'-'+i+'-lat" value="'+s.lat+'"></div>' +
           '<div class="field"><label>Longitude</label><input type="number" step="0.000001" id="f-'+g+'-'+i+'-lng" value="'+s.lng+'"></div>' +
-          '<div class="field"><label>Par</label><input type="number" min="1" max="9" id="f-'+g+'-'+i+'-par" value="'+s.par+'"></div>' +
-          '<div class="field"><label>Challenge Titel</label><input type="text" id="f-'+g+'-'+i+'-clueTitle" value="'+safeVal(s.clueTitle)+'"></div>' +
-          '<div class="field full"><label>Challenge Omschrijving</label><textarea id="f-'+g+'-'+i+'-challenge">'+safeText(s.challenge)+'</textarea></div>' +
-          '<div class="field full"><div class="photo-toggle-row">' +
-            '<span class="photo-toggle-label">📸 Foto verplicht</span>' +
-            '<label class="toggle-switch"><input type="checkbox" id="f-'+g+'-'+i+'-photo"'+(s.photo?' checked':'')+'><span class="toggle-track"></span></label>' +
-          '</div></div>' +
-          '<div class="field full"><div class="wildcard-toggle-row">' +
-            '<span class="wildcard-toggle-label">🃏 Wildcard hole</span>' +
-            '<label class="toggle-switch"><input type="checkbox" id="f-'+g+'-'+i+'-wildcard"'+(s.wildcard?' checked':'')+'><span class="toggle-track"></span></label>' +
-          '</div></div>' +
-        '</div>';
+        '</div>' +
+        '<div style="margin-top:10px;">' + challengeHtml + '</div>' +
+        '<button class="btn-add-challenge" onclick="addChallenge(\''+g+'\','+i+')">+ Challenge toevoegen</button>';
       box.appendChild(d);
     });
   });
@@ -1584,16 +2211,24 @@ function toggleBonusFields(suffix) {
 function readEditor(g) {
   var result = [];
   for (var i = 0; i < course[g].length; i++) {
+    var chs = course[g][i].challenges || [{}];
+    var challenges = chs.map(function(_, ci) {
+      return {
+        clueTitle:    (document.getElementById('f-'+g+'-'+i+'-'+ci+'-clueTitle') || {}).value || '',
+        challenge:    (document.getElementById('f-'+g+'-'+i+'-'+ci+'-challenge') || {}).value || '',
+        letter:       ((document.getElementById('f-'+g+'-'+i+'-'+ci+'-letter') || {}).value || '').toUpperCase().trim(),
+        letterGifUrl: (document.getElementById('f-'+g+'-'+i+'-'+ci+'-gifUrl') || {}).value || '',
+        par:          parseInt((document.getElementById('f-'+g+'-'+i+'-'+ci+'-par') || {}).value) || 2,
+        photo:        !!(document.getElementById('f-'+g+'-'+i+'-'+ci+'-photo') || {}).checked,
+        wildcard:     !!(document.getElementById('f-'+g+'-'+i+'-'+ci+'-wildcard') || {}).checked
+      };
+    });
     result.push({
-      name:      document.getElementById('f-'+g+'-'+i+'-name').value,
-      address:   document.getElementById('f-'+g+'-'+i+'-address').value,
-      lat:       parseFloat(document.getElementById('f-'+g+'-'+i+'-lat').value)||0,
-      lng:       parseFloat(document.getElementById('f-'+g+'-'+i+'-lng').value)||0,
-      par:       parseInt(document.getElementById('f-'+g+'-'+i+'-par').value)||2,
-      clueTitle: document.getElementById('f-'+g+'-'+i+'-clueTitle').value,
-      challenge: document.getElementById('f-'+g+'-'+i+'-challenge').value,
-      photo:     document.getElementById('f-'+g+'-'+i+'-photo').checked,
-      wildcard:  document.getElementById('f-'+g+'-'+i+'-wildcard').checked
+      name:    document.getElementById('f-'+g+'-'+i+'-name').value,
+      address: document.getElementById('f-'+g+'-'+i+'-address').value,
+      lat:     parseFloat(document.getElementById('f-'+g+'-'+i+'-lat').value) || 0,
+      lng:     parseFloat(document.getElementById('f-'+g+'-'+i+'-lng').value) || 0,
+      challenges: challenges
     });
   }
   return result;
@@ -1626,6 +2261,7 @@ function readBonus(suffix) {
 function saveRoute() {
   course.nameA = document.getElementById('team-name-a').value.trim() || 'Team A';
   course.nameB = document.getElementById('team-name-b').value.trim() || 'Team B';
+  course.refereeCode = document.getElementById('referee-code').value.trim().toUpperCase();
   course.A = readEditor('A');
   course.B = readEditor('B');
   // read wildcards from whichever suffix is visible
@@ -1674,8 +2310,21 @@ function geocodeBonus(suffix) {
   }).catch(function() { toast('❌ Adres niet gevonden'); });
 }
 
+function addChallenge(g, si) {
+  course[g][si].challenges = course[g][si].challenges || [];
+  course[g][si].challenges.push({ clueTitle:'Nieuwe Challenge', challenge:'Omschrijf de challenge hier.', par:2, photo:false, wildcard:false, letter:'', letterGifUrl:'' });
+  renderEditor(g);
+}
+
+function removeChallenge(g, si, ci) {
+  if ((course[g][si].challenges || []).length <= 1) { toast('Minimaal 1 challenge per stop'); return; }
+  course[g][si].challenges.splice(ci, 1);
+  renderEditor(g);
+}
+
 function addStop(g) {
-  course[g].push({ name:'Nieuwe Stop', address:'Adres invoeren', lat:52.3702, lng:4.8952, par:2, clueTitle:'Nieuwe Challenge', challenge:'Omschrijf de challenge hier.', photo:false, wildcard:false });
+  course[g].push({ name:'Nieuwe Stop', address:'Adres invoeren', lat:52.3702, lng:4.8952,
+    challenges:[{ clueTitle:'Nieuwe Challenge', challenge:'Omschrijf de challenge hier.', par:2, photo:false, wildcard:false, letter:'', letterGifUrl:'' }] });
   renderEditor(g);
   setTimeout(function() {
     var gl = g.toLowerCase();
@@ -1746,26 +2395,40 @@ function importCSV() {
     clueTitle: headers.indexOf('challenge titel'),
     challenge: headers.indexOf('challenge omschrijving'),
     foto: headers.indexOf('foto'),
-    wildcard: headers.indexOf('wildcard')
+    wildcard: headers.indexOf('wildcard'),
+    letter: headers.indexOf('letter'),
+    gifUrl: headers.indexOf('letter gif url')
   };
   if (idx.groep === -1 || idx.naam === -1) { toast('Kolomnamen niet herkend — controleer de headerrij'); return; }
   var count = 0;
+  // Group rows by stop name+groep so multiple challenges per stop merge
+  var stopMap = { A: {}, B: {} };
   lines.slice(1).forEach(function(line) {
     var cols = parseCSVLine(line);
     var raw = (cols[idx.groep] || '').trim();
     var g = /^(a|1|team\s*a|team\s*1)$/i.test(raw) ? 'A' : /^(b|2|team\s*b|team\s*2)$/i.test(raw) ? 'B' : null;
     if (!g) return;
-    course[g].push({
-      name: (cols[idx.naam] || 'Stop').trim(),
-      address: (cols[idx.adres] || '').trim(),
-      lat: 52.3702, lng: 4.8952,
-      par: parseInt(cols[idx.par]) || 2,
-      clueTitle: (cols[idx.clueTitle] || '').trim(),
-      challenge: (cols[idx.challenge] || '').trim(),
-      photo: /ja/i.test(cols[idx.foto] || ''),
-      wildcard: /ja/i.test(cols[idx.wildcard] || '')
-    });
-    count++;
+    var naam = (cols[idx.naam] || 'Stop').trim();
+    var adres = (cols[idx.adres] || '').trim();
+    var key = naam + '||' + adres;
+    var ch = {
+      clueTitle:    (cols[idx.clueTitle] || '').trim(),
+      challenge:    (cols[idx.challenge] || '').trim(),
+      par:          parseInt(cols[idx.par]) || 2,
+      photo:        /ja/i.test(cols[idx.foto] || ''),
+      wildcard:     /ja/i.test(cols[idx.wildcard] || ''),
+      letter:       idx.letter >= 0 ? (cols[idx.letter] || '').trim().toUpperCase().charAt(0) : '',
+      letterGifUrl: idx.gifUrl >= 0 ? (cols[idx.gifUrl] || '').trim() : ''
+    };
+    if (stopMap[g][key]) {
+      stopMap[g][key].challenges.push(ch);
+    } else {
+      stopMap[g][key] = { name: naam, address: adres, lat: 52.3702, lng: 4.8952, challenges: [ch] };
+      count++;
+    }
+  });
+  ['A','B'].forEach(function(g) {
+    Object.keys(stopMap[g]).forEach(function(k) { course[g].push(stopMap[g][k]); });
   });
   renderEditor('A');
   renderEditor('B');

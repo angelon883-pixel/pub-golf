@@ -1,0 +1,7 @@
+Groep,Naam,Adres,Par,Challenge Titel,Challenge Omschrijving,Foto,Wildcard,Letter,Letter GIF URL
+Team 1,Cafe De Kroeg,Hoofdstraat 1 Amsterdam,3,De Welkomstdrink,Bestel een drankje zonder te praten. Gebruik alleen handgebaren.,nee,nee,P,https://media.giphy.com/media/example1/giphy.gif
+Team 1,Cafe De Kroeg,Hoofdstraat 1 Amsterdam,2,De Selfie Challenge,Maak een selfie met de barman zonder het te vragen.,ja,nee,U,https://media.giphy.com/media/example2/giphy.gif
+Team 2,Cafe Het Anker,Kerkstraat 5 Amsterdam,3,De Welkomstdrink,Bestel een drankje zonder te praten. Gebruik alleen handgebaren.,nee,nee,B,https://media.giphy.com/media/example3/giphy.gif
+Team 1,Cafe Het Centrum,Marktplein 12 Amsterdam,2,De Dans Challenge,Dans 30 seconden met een vreemde.,nee,ja,G,
+Team 2,Cafe Het Anker,Kerkstraat 5 Amsterdam,2,De Foto Challenge,Maak een groepsfoto met alle aanwezigen.,ja,nee,O,
+Team 2,Cafe De Brug,Brugstraat 8 Amsterdam,3,De Quiz Vraag,Beantwoord een triviavraag van de barman.,nee,nee,L,
