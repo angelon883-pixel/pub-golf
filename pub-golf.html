@@ -271,7 +271,9 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
 
 .stop-block { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-bottom: 10px; }
 .stop-block.dragging { opacity: 0.4; }
-.stop-block.drag-over { border-color: var(--gold); border-style: dashed; }
+.stop-block.drag-before { border-top: 3px solid var(--green); }
+.stop-block.drag-after  { border-bottom: 3px solid var(--green); }
+.stop-block.drag-merge  { border-color: var(--gold); border-style: dashed; background: #1a1000; }
 .stop-drag-handle { cursor: grab; font-size: 20px; color: var(--muted); padding: 0 6px 0 0; user-select: none; }
 .stop-block-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .stop-block-num { font-family: 'Bebas Neue', sans-serif; font-size: 18px; color: var(--muted); }
@@ -545,6 +547,7 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
   <div class="session-sub" id="session-menu-sub">Wat wil je doen?</div>
   <button class="group-btn group-a" id="btn-edit-route" style="margin-bottom:20px; width:100%; max-width:280px; display:none;" onclick="openEditor()"><span class="emoji">✏️</span>ROUTE BEWERKEN</button>
   <button class="group-btn group-b" style="width:100%; max-width:280px;" onclick="goToGroupSelect()"><span class="emoji">▶</span>SPELEN</button>
+  <button id="btn-leave-session" onclick="leaveSession()" style="display:none; margin-top:16px; background:none; border:none; color:var(--muted); font-family:'DM Mono',monospace; font-size:13px; cursor:pointer; letter-spacing:1px;">Sessie verlaten</button>
 </div>
 
 <!-- GROUP SELECT -->
@@ -603,6 +606,7 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
       <div id="panel-wc" style="display:none">
         <div id="wildcard-editor-mobile"></div>
         <div id="bonus-editor-mobile"></div>
+        <div id="puzzle-editor-mobile"></div>
       </div>
       <button class="btn-save" onclick="saveRoute()">✓ Opslaan</button>
       <button class="btn-back" onclick="closeEditor()">← Terug zonder opslaan</button>
@@ -625,6 +629,9 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
       <div style="margin-top:28px; display:grid; grid-template-columns:1fr 1fr; gap:28px;">
         <div id="wildcard-editor-desktop"></div>
         <div id="bonus-editor-desktop"></div>
+      </div>
+      <div style="margin-top:28px;">
+        <div id="puzzle-editor-desktop"></div>
       </div>
       <div class="desktop-actions">
         <button class="btn-save" onclick="saveRoute()">✓ Opslaan</button>
@@ -754,6 +761,10 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
 <!-- REFEREE -->
 <div class="screen" id="screen-referee">
   <div class="referee-header">
+    <div style="display:flex; align-items:center; justify-content:space-between; width:100%; margin-bottom:4px;">
+      <button onclick="exitRefereeView()" style="background:none; border:none; color:var(--muted); font-size:14px; cursor:pointer; font-family:'DM Mono',monospace; letter-spacing:1px; padding:0;">← Verlaat</button>
+      <button onclick="resetSession()" style="background:none; border:1px solid var(--secondary); color:var(--secondary); font-size:12px; cursor:pointer; font-family:'DM Mono',monospace; border-radius:6px; padding:6px 10px;">🔄 Reset sessie</button>
+    </div>
     <div class="referee-title">🎯 Scheidsrechter</div>
     <div id="referee-team-label" style="font-size:12px; color:var(--muted);"></div>
   </div>
@@ -785,9 +796,16 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
 
 <!-- PUZZLE -->
 <div class="screen" id="screen-puzzle">
+  <!-- Intro overlay -->
+  <div id="puzzle-intro-overlay" style="position:absolute;inset:0;background:var(--dark);z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;text-align:center;">
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:36px;color:var(--gold);margin-bottom:16px;">🔤 Eindspel!</div>
+    <div id="puzzle-intro-text" style="font-size:15px;color:var(--text);line-height:1.6;margin-bottom:32px;max-width:320px;"></div>
+    <button class="btn-primary" onclick="startPuzzleGame()" style="font-size:20px;padding:16px 40px;">▶ Start!</button>
+  </div>
   <div class="puzzle-header">
     <div class="puzzle-title">🔤 Maak de zin!</div>
-    <div class="puzzle-sub">Sleep de letters naar de juiste volgorde. Fout = 3 seconden tijdstraf.</div>
+    <div id="puzzle-timer" style="font-family:'Bebas Neue',sans-serif;font-size:40px;color:var(--gold);line-height:1;">0:00</div>
+    <div class="puzzle-sub">Sleep de letters naar de juiste volgorde. Fout = +5s tijdstraf.</div>
   </div>
   <div class="puzzle-body">
     <div id="puzzle-penalty" class="puzzle-penalty"></div>
@@ -866,6 +884,11 @@ var DEFAULTS = {
     lng: 4.9003,
     par: 2,
     challenge: "Iedereen bestelt hetzelfde drankje als de eerste persoon die binnenkomt na jullie. Geen uitzonderingen."
+  },
+  puzzle: {
+    introText: 'Jullie hebben alle letters verzameld! Sleep ze naar de juiste volgorde om de zin te onthullen.',
+    answer: '',
+    completionGifUrl: ''
   }
 };
 
@@ -965,6 +988,7 @@ function goToSessionMenu() {
   }
   var canEdit = !sessionCode || !course.refereeCode || canEditCourse;
   document.getElementById('btn-edit-route').style.display = canEdit ? '' : 'none';
+  document.getElementById('btn-leave-session').style.display = sessionCode ? '' : 'none';
   show('screen-session-menu');
 }
 
@@ -1200,6 +1224,7 @@ function updateTravelTime(dist) {
 }
 
 function startGame() {
+  gameStartTime = Date.now();
   var hdr = document.getElementById('hdr-group');
   hdr.textContent = (group === 'A' ? course.nameA : course.nameB) || ('GROUP ' + group);
   hdr.className = 'header-group ' + group.toLowerCase();
@@ -1209,7 +1234,19 @@ function startGame() {
   renderScorecard();
   show('screen-game');
   startGPS();
-  if (sessionCode) startSync();
+  if (sessionCode) {
+    startSync();
+    // Listen for referee-triggered session reset
+    var db = getFirebase();
+    if (db) {
+      db.ref('sessions/' + sessionCode + '/reset').on('value', function(snap) {
+        if (snap.val() && snap.val() > gameStartTime) {
+          toast('🔄 Scheidsrechter heeft de sessie gereset');
+          setTimeout(function() { leaveGame(); }, 2000);
+        }
+      });
+    }
+  }
 }
 
 // ── SESSION / LIVE SCORE + LOCATION (Firebase Realtime Database) ──────────────────────
@@ -1905,6 +1942,31 @@ function finishGame() {
   show('screen-finish');
 }
 
+var gameStartTime = 0;
+
+function leaveSession() {
+  if (!confirm('Sessie verlaten en terug naar het beginscherm?')) return;
+  stopSync(); sessionCode = null; canEditCourse = false;
+  show('screen-intro');
+}
+
+function exitRefereeView() {
+  if (refereeStateRef) { refereeStateRef.off(); refereeStateRef = null; }
+  isReferee = false;
+  goToSessionMenu();
+}
+
+function resetSession() {
+  if (!sessionCode) { toast('Geen actieve sessie'); return; }
+  if (!confirm('Alle voortgang wissen voor beide teams? Dit kan niet ongedaan worden.')) return;
+  var db = getFirebase(); if (!db) return;
+  var reset = { stopIdx: 0, challengeIdx: 0, scores: [], earnedLetters: [], ts: Date.now() };
+  db.ref('sessions/' + sessionCode + '/gameState/A').set(reset);
+  db.ref('sessions/' + sessionCode + '/gameState/B').set(reset);
+  db.ref('sessions/' + sessionCode + '/reset').set(Date.now());
+  toast('✅ Sessie gereset voor beide teams');
+}
+
 function pushGameState() {
   if (!sessionCode) return;
   var db = getFirebase(); if (!db) return;
@@ -1931,21 +1993,33 @@ function leaveGame() {
 function restart() { stopGPS(); stopSync(); photos = {}; sessionCode = null; playerId = null; canEditCourse = false; show('screen-intro'); }
 
 // ── PUZZLE ────────────────────────────────────
-var puzzleAnswer = [];    // correct letter order
-var puzzleSlotFilled = []; // letter placed in each slot (or null)
+var puzzleAnswer = [];
+var puzzleSlotFilled = [];
 var puzzlePenaltyTime = 0;
 var puzzlePenaltyTimer = null;
+var puzzleTimerSecs = 0;
+var puzzleTimerInterval = null;
+
+function formatPuzzleTime(s) {
+  return Math.floor(s / 60) + ':' + (s % 60 < 10 ? '0' : '') + (s % 60);
+}
 
 function openPuzzle() {
-  // Shuffle earnedLetters for display in pool
-  var letters = earnedLetters.slice();
-  // Fisher-Yates shuffle
+  var puz = course.puzzle || {};
+  // Determine correct answer
+  if (puz.answer && puz.answer.trim()) {
+    puzzleAnswer = puz.answer.toUpperCase().replace(/[^A-Z]/g, '').split('');
+  } else {
+    puzzleAnswer = earnedLetters.slice();
+  }
+  puzzleSlotFilled = puzzleAnswer.map(function() { return null; });
+
+  // Shuffle letters for pool display
+  var letters = puzzleAnswer.slice();
   for (var i = letters.length - 1; i > 0; i--) {
     var j = Math.floor(Math.random() * (i + 1));
     var tmp = letters[i]; letters[i] = letters[j]; letters[j] = tmp;
   }
-  puzzleAnswer = earnedLetters.slice(); // correct order = order they were earned
-  puzzleSlotFilled = puzzleAnswer.map(function() { return null; });
 
   var pool = document.getElementById('puzzle-pool');
   var slots = document.getElementById('puzzle-slots');
@@ -1953,6 +2027,10 @@ function openPuzzle() {
   slots.innerHTML = '';
   document.getElementById('puzzle-penalty').textContent = '';
   document.getElementById('puzzle-score').textContent = '';
+  document.getElementById('puzzle-timer').textContent = '0:00';
+  puzzleTimerSecs = 0;
+  puzzlePenaltyTime = 0;
+  if (puzzleTimerInterval) clearInterval(puzzleTimerInterval);
 
   letters.forEach(function(letter, i) {
     var tile = document.createElement('div');
@@ -1975,7 +2053,20 @@ function openPuzzle() {
     slots.appendChild(slot);
   });
 
+  // Show intro overlay
+  var introText = puz.introText || 'Maak een zin van de letters die je hebt verzameld!';
+  document.getElementById('puzzle-intro-text').textContent = introText;
+  document.getElementById('puzzle-intro-overlay').style.display = 'flex';
+
   show('screen-puzzle');
+}
+
+function startPuzzleGame() {
+  document.getElementById('puzzle-intro-overlay').style.display = 'none';
+  puzzleTimerInterval = setInterval(function() {
+    puzzleTimerSecs++;
+    document.getElementById('puzzle-timer').textContent = formatPuzzleTime(puzzleTimerSecs);
+  }, 1000);
 }
 
 function addDragToTile(tile) {
@@ -2051,7 +2142,8 @@ function dropOnSlot(slot, tile) {
 }
 
 function applyPuzzlePenalty() {
-  puzzlePenaltyTime += 3;
+  puzzlePenaltyTime += 5;
+  puzzleTimerSecs += 5;
   if (puzzlePenaltyTimer) clearInterval(puzzlePenaltyTimer);
   updatePenaltyDisplay();
   puzzlePenaltyTimer = setInterval(function() {
@@ -2074,9 +2166,16 @@ function checkPuzzleWin() {
   var allCorrect = puzzleSlotFilled.every(function(l, i) { return l === puzzleAnswer[i]; });
   if (allCorrect) {
     clearInterval(puzzlePenaltyTimer);
+    clearInterval(puzzleTimerInterval);
     var sentence = puzzleAnswer.join('');
-    document.getElementById('puzzle-score').textContent = '🎉 Gelukt! "' + sentence + '"';
-    setTimeout(function() { finishGame(); }, 2000);
+    var finalTime = formatPuzzleTime(puzzleTimerSecs);
+    document.getElementById('puzzle-score').textContent = '🎉 Gelukt! "' + sentence + '" — Tijd: ' + finalTime;
+    var gifUrl = (course.puzzle || {}).completionGifUrl || '';
+    if (gifUrl) {
+      showLetterReveal('🏆', gifUrl, function() { finishGame(); });
+    } else {
+      setTimeout(function() { finishGame(); }, 2500);
+    }
   }
 }
 
@@ -2115,6 +2214,7 @@ function openEditor() {
   renderEditor('A'); renderEditor('B');
   renderWildcardEditor('mobile'); renderWildcardEditor('desktop');
   renderBonusEditor('mobile'); renderBonusEditor('desktop');
+  renderPuzzleEditor('mobile'); renderPuzzleEditor('desktop');
   editTab = 'A';
   document.getElementById('panel-a').style.display = 'block';
   document.getElementById('panel-b').style.display = 'none';
@@ -2159,7 +2259,11 @@ function renderEditor(g) {
             '<div class="field"><label>Titel</label><input type="text" id="f-'+g+'-'+i+'-'+ci+'-clueTitle" value="'+safeVal(ch.clueTitle)+'"></div>' +
             '<div class="field"><label>Letter</label><input type="text" id="f-'+g+'-'+i+'-'+ci+'-letter" maxlength="1" value="'+safeVal(ch.letter)+'" style="text-transform:uppercase;"></div>' +
             '<div class="field full"><label>Challenge omschrijving</label><textarea id="f-'+g+'-'+i+'-'+ci+'-challenge">'+safeText(ch.challenge)+'</textarea></div>' +
-            '<div class="field full"><label>Letter GIF URL</label><input type="text" id="f-'+g+'-'+i+'-'+ci+'-gifUrl" value="'+safeVal(ch.letterGifUrl)+'" placeholder="https://...gif"></div>' +
+            '<div class="field full"><label>Letter GIF</label><div style="display:flex;gap:6px;">' +
+              '<input type="text" id="f-'+g+'-'+i+'-'+ci+'-gifUrl" value="'+safeVal(ch.letterGifUrl)+'" placeholder="https://...gif" style="flex:1;">' +
+              '<label style="display:flex;align-items:center;justify-content:center;width:38px;height:38px;background:var(--card);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:16px;" title="GIF uploaden">📁' +
+                '<input type="file" accept="image/gif,image/webp,image/png" style="display:none;" onchange="handleGifUpload(this,\'f-'+g+'-'+i+'-'+ci+'-gifUrl\')">' +
+              '</label></div></div>' +
             '<div class="field"><label>Par</label><input type="number" min="1" max="9" id="f-'+g+'-'+i+'-'+ci+'-par" value="'+(ch.par||2)+'"></div>' +
             '<div class="field"><div class="photo-toggle-row"><span class="photo-toggle-label">📸 Foto</span><label class="toggle-switch"><input type="checkbox" id="f-'+g+'-'+i+'-'+ci+'-photo"'+(ch.photo?' checked':'')+'><span class="toggle-track"></span></label></div></div>' +
             '<div class="field"><div class="wildcard-toggle-row"><span class="wildcard-toggle-label">🃏 Wildcard</span><label class="toggle-switch"><input type="checkbox" id="f-'+g+'-'+i+'-'+ci+'-wildcard"'+(ch.wildcard?' checked':'')+'><span class="toggle-track"></span></label></div></div>' +
@@ -2172,16 +2276,33 @@ function renderEditor(g) {
       d.setAttribute('draggable', 'true');
       (function(si, grp) {
         d.addEventListener('dragstart', function(e) { e.dataTransfer.setData('text/plain', String(si)); d.classList.add('dragging'); });
-        d.addEventListener('dragend', function() { d.classList.remove('dragging'); });
-        d.addEventListener('dragover', function(e) { e.preventDefault(); d.classList.add('drag-over'); });
-        d.addEventListener('dragleave', function() { d.classList.remove('drag-over'); });
+        d.addEventListener('dragend', function() { d.className = 'stop-block'; });
+        d.addEventListener('dragover', function(e) {
+          e.preventDefault();
+          var ratio = e.offsetY / d.offsetHeight;
+          var zone = ratio < 0.3 ? 'before' : ratio > 0.7 ? 'after' : 'merge';
+          d.dataset.dropZone = zone;
+          d.className = 'stop-block drag-' + zone;
+        });
+        d.addEventListener('dragleave', function() { d.className = 'stop-block'; });
         d.addEventListener('drop', function(e) {
-          e.preventDefault(); d.classList.remove('drag-over');
+          e.preventDefault();
+          var zone = d.dataset.dropZone || 'after';
+          d.className = 'stop-block';
           var from = parseInt(e.dataTransfer.getData('text/plain'));
           if (from === si) return;
           var arr = course[grp];
-          var moved = arr.splice(from, 1)[0];
-          arr.splice(si, 0, moved);
+          if (zone === 'merge') {
+            var moved = arr.splice(from, 1)[0];
+            var target = arr[from < si ? si - 1 : si];
+            target.challenges = target.challenges.concat(moved.challenges);
+          } else {
+            var moved = arr.splice(from, 1)[0];
+            var insertAt = zone === 'before'
+              ? (from < si ? si - 1 : si)
+              : (from < si ? si : si + 1);
+            arr.splice(insertAt, 0, moved);
+          }
           renderEditor(grp);
         });
       })(i, g);
@@ -2202,6 +2323,64 @@ function renderEditor(g) {
       box.appendChild(d);
     });
   });
+}
+
+function handleGifUpload(input, targetId) {
+  var file = input.files[0]; if (!file) return;
+  if (file.size > 2 * 1024 * 1024) { toast('GIF te groot — max 2MB'); return; }
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var el = document.getElementById(targetId);
+    if (el) { el.value = e.target.result; toast('✅ GIF geladen'); }
+  };
+  reader.readAsDataURL(file);
+}
+
+function stripLocalGifsForFirebase(courseObj) {
+  var c = JSON.parse(JSON.stringify(courseObj));
+  ['A', 'B'].forEach(function(g) {
+    (c[g] || []).forEach(function(s) {
+      (s.challenges || []).forEach(function(ch) {
+        if (ch.letterGifUrl && ch.letterGifUrl.startsWith('data:')) ch.letterGifUrl = '';
+      });
+    });
+  });
+  if (c.puzzle && c.puzzle.completionGifUrl && c.puzzle.completionGifUrl.startsWith('data:'))
+    c.puzzle.completionGifUrl = '';
+  return c;
+}
+
+function renderPuzzleEditor(suffix) {
+  var box = document.getElementById('puzzle-editor-' + suffix);
+  if (!box) return;
+  var p = course.puzzle || {};
+  box.innerHTML = '<div class="bonus-editor" style="margin-top:16px;">' +
+    '<div class="bonus-editor-title">🔤 Eindspel</div>' +
+    '<div class="bonus-editor-sub">Configureer het eindspel waarbij spelers letters slepen.</div>' +
+    '<div class="field full"><label>Intro-tekst</label>' +
+      '<textarea id="puzzle-intro-' + suffix + '" rows="3">' + safeText(p.introText || '') + '</textarea></div>' +
+    '<div class="field full"><label>Verwacht antwoord <span style="color:var(--muted);font-size:11px;">(leeg = volgorde van verdiende letters)</span></label>' +
+      '<input type="text" id="puzzle-answer-' + suffix + '" value="' + safeVal(p.answer || '') + '" placeholder="bijv. PUBGOLF" style="text-transform:uppercase;"></div>' +
+    '<div class="field full"><label>Voltooiings-GIF</label>' +
+      '<div style="display:flex;gap:6px;">' +
+        '<input type="text" id="puzzle-gif-' + suffix + '" value="' + safeVal(p.completionGifUrl || '') + '" placeholder="https://...gif" style="flex:1;">' +
+        '<label style="display:flex;align-items:center;justify-content:center;width:38px;height:38px;background:var(--card);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:16px;" title="GIF uploaden">' +
+          '📁<input type="file" accept="image/gif,image/webp,image/png" style="display:none;" onchange="handleGifUpload(this,\'puzzle-gif-' + suffix + '\')">' +
+        '</label>' +
+      '</div></div>' +
+  '</div>';
+}
+
+function readPuzzle(suffix) {
+  var intro = document.getElementById('puzzle-intro-' + suffix);
+  var ans   = document.getElementById('puzzle-answer-' + suffix);
+  var gif   = document.getElementById('puzzle-gif-' + suffix);
+  if (!intro) return course.puzzle || {};
+  return {
+    introText: intro.value.trim(),
+    answer: (ans.value || '').toUpperCase().replace(/[^A-Z]/g, ''),
+    completionGifUrl: gif.value.trim()
+  };
 }
 
 function renderWildcardEditor(suffix) {
@@ -2334,10 +2513,11 @@ function saveRoute() {
   var wcSuffix = window.innerWidth >= 900 ? 'desktop' : 'mobile';
   course.wildcards = readWildcards(wcSuffix);
   course.bonus = readBonus(wcSuffix);
+  course.puzzle = readPuzzle(wcSuffix);
   localStorage.setItem('pg_course', JSON.stringify(course));
   if (sessionCode) {
     var db = getFirebase();
-    if (db) db.ref('courses/' + sessionCode).set(course);
+    if (db) db.ref('courses/' + sessionCode).set(stripLocalGifsForFirebase(course));
   }
   toast('✅ Course opgeslagen!');
   setTimeout(closeEditor, 700);
