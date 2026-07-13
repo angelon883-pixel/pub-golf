@@ -270,6 +270,9 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
 .tab-btn.sel-wc { border-color: var(--gold); color: var(--gold); }
 
 .stop-block { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-bottom: 10px; }
+.stop-block.dragging { opacity: 0.4; }
+.stop-block.drag-over { border-color: var(--gold); border-style: dashed; }
+.stop-drag-handle { cursor: grab; font-size: 20px; color: var(--muted); padding: 0 6px 0 0; user-select: none; }
 .stop-block-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .stop-block-num { font-family: 'Bebas Neue', sans-serif; font-size: 18px; color: var(--muted); }
 .btn-remove { background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--secondary); font-size: 11px; padding: 4px 10px; cursor: pointer; font-family: 'DM Mono', monospace; }
@@ -540,7 +543,7 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
   <button class="btn-back" style="margin-bottom:20px; max-width:280px;" onclick="show('screen-session'); renderSavedSessions();">← Terug</button>
   <div class="session-title" id="session-menu-title">Sessie</div>
   <div class="session-sub" id="session-menu-sub">Wat wil je doen?</div>
-  <button class="group-btn group-a" style="margin-bottom:20px; width:100%; max-width:280px;" onclick="openEditor()"><span class="emoji">✏️</span>ROUTE BEWERKEN</button>
+  <button class="group-btn group-a" id="btn-edit-route" style="margin-bottom:20px; width:100%; max-width:280px; display:none;" onclick="openEditor()"><span class="emoji">✏️</span>ROUTE BEWERKEN</button>
   <button class="group-btn group-b" style="width:100%; max-width:280px;" onclick="goToGroupSelect()"><span class="emoji">▶</span>SPELEN</button>
 </div>
 
@@ -634,9 +637,12 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
 <!-- GAME -->
 <div class="screen" id="screen-game">
   <div class="header">
-    <div>
-      <div class="header-group a" id="hdr-group">GROUP A</div>
-      <div class="score-badge">Strokes: <span id="hdr-score">0</span></div>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <button onclick="leaveGame()" style="background:none; border:none; color:var(--muted); font-size:20px; cursor:pointer; padding:0; line-height:1;" title="Verlaat spel">✕</button>
+      <div>
+        <div class="header-group a" id="hdr-group">GROUP A</div>
+        <div class="score-badge">Strokes: <span id="hdr-score">0</span></div>
+      </div>
     </div>
     <div class="gps-pill">
       <div class="gps-dot" id="gps-dot"></div>
@@ -897,6 +903,7 @@ var map = null, playerMarker = null, destMarker = null, routeLine = null;
 var lastPos = null;
 var isReferee = false;
 var refereeGroup = null;
+var canEditCourse = false;
 var refereeStateRef = null;
 
 // session
@@ -927,7 +934,21 @@ function chooseGroup(g) {
   bonusInserted = false;
   bonusPending = false;
   isReferee = false;
-  startGame();
+  loadGameState(function(state) {
+    if (state && state.stopIdx > 0) {
+      openNameModal('Doorgaan bij hole ' + (state.stopIdx + 1) + '? (Ja = doorgaan)', function(ans) {
+        if (ans) {
+          stopIdx = state.stopIdx;
+          challengeIdx = state.challengeIdx || 0;
+          scores = state.scores || [];
+          earnedLetters = state.earnedLetters || [];
+        }
+        startGame();
+      });
+    } else {
+      startGame();
+    }
+  });
 }
 
 function goToGroupSelect() { show('screen-group'); }
@@ -942,6 +963,8 @@ function goToSessionMenu() {
     title.textContent = 'Sessie';
     sub.textContent = 'Bewerk de route of begin met spelen.';
   }
+  var canEdit = !sessionCode || !course.refereeCode || canEditCourse;
+  document.getElementById('btn-edit-route').style.display = canEdit ? '' : 'none';
   show('screen-session-menu');
 }
 
@@ -1269,6 +1292,9 @@ function closeNameModal(save) {
 
 function createSession() {
   sessionCode = randomCode();
+  canEditCourse = true;
+  var db = getFirebase();
+  if (db) db.ref('courses/' + sessionCode).set(course);
   openNameModal('Geef deze sessie een naam', function(name) {
     saveSessionEntry(sessionCode, name);
     openEditor();
@@ -1456,8 +1482,8 @@ function enterRefereeMode() {
   if (!course.refereeCode || input !== course.refereeCode.toUpperCase()) {
     toast('❌ Verkeerde code'); return;
   }
+  canEditCourse = true;
   openNameModal('Welk team begeleid je?', function(teamName) {
-    // use teamName as hint but ask group
     openRefGroupSelect();
   });
 }
@@ -1725,13 +1751,12 @@ function advanceChallenge() {
   var totalCh = (s.challenges || []).length;
   if (challengeIdx < totalCh - 1) {
     challengeIdx++;
-    // re-show clue for next challenge (already arrived)
+    pushGameState();
     document.getElementById('clue-open').classList.remove('visible', 'animate');
     document.getElementById('clue-locked').classList.remove('hidden');
     setTimeout(function() { unlockClue(s); }, 300);
     renderStop();
   } else {
-    // all challenges done, now enter score
     document.getElementById('btn-log').classList.add('visible');
   }
 }
@@ -1742,6 +1767,7 @@ function showLetterReveal(letter, gifUrl, cb) {
   var prog = document.getElementById('letter-reveal-progress');
   document.getElementById('letter-reveal-letter').textContent = letter;
   earnedLetters.push(letter);
+  pushGameState();
   if (gifUrl) { img.src = gifUrl; img.style.display = 'block'; }
   else { img.style.display = 'none'; }
   el.classList.add('show');
@@ -1792,6 +1818,7 @@ function confirmScore() {
   scores[stopIdx] = pickedScore;
   pushScore();
   stopIdx++;
+  pushGameState();
 
   // check bonus hole trigger
   var bonus = course.bonus;
@@ -1878,7 +1905,30 @@ function finishGame() {
   show('screen-finish');
 }
 
-function restart() { stopGPS(); stopSync(); photos = {}; sessionCode = null; playerId = null; show('screen-intro'); }
+function pushGameState() {
+  if (!sessionCode) return;
+  var db = getFirebase(); if (!db) return;
+  db.ref('sessions/' + sessionCode + '/gameState/' + group).set({
+    stopIdx: stopIdx, challengeIdx: challengeIdx,
+    scores: scores, earnedLetters: earnedLetters, ts: Date.now()
+  });
+}
+
+function loadGameState(cb) {
+  if (!sessionCode) { cb(null); return; }
+  var db = getFirebase(); if (!db) { cb(null); return; }
+  db.ref('sessions/' + sessionCode + '/gameState/' + group).once('value')
+    .then(function(snap) { cb(snap.val()); }).catch(function() { cb(null); });
+}
+
+function leaveGame() {
+  if (!confirm('Spel verlaten? Je voortgang is opgeslagen.')) return;
+  pushGameState();
+  stopGPS();
+  show('screen-session-menu');
+}
+
+function restart() { stopGPS(); stopSync(); photos = {}; sessionCode = null; playerId = null; canEditCourse = false; show('screen-intro'); }
 
 // ── PUZZLE ────────────────────────────────────
 var puzzleAnswer = [];    // correct letter order
@@ -2119,8 +2169,24 @@ function renderEditor(g) {
 
       var d = document.createElement('div');
       d.className = 'stop-block';
+      d.setAttribute('draggable', 'true');
+      (function(si, grp) {
+        d.addEventListener('dragstart', function(e) { e.dataTransfer.setData('text/plain', String(si)); d.classList.add('dragging'); });
+        d.addEventListener('dragend', function() { d.classList.remove('dragging'); });
+        d.addEventListener('dragover', function(e) { e.preventDefault(); d.classList.add('drag-over'); });
+        d.addEventListener('dragleave', function() { d.classList.remove('drag-over'); });
+        d.addEventListener('drop', function(e) {
+          e.preventDefault(); d.classList.remove('drag-over');
+          var from = parseInt(e.dataTransfer.getData('text/plain'));
+          if (from === si) return;
+          var arr = course[grp];
+          var moved = arr.splice(from, 1)[0];
+          arr.splice(si, 0, moved);
+          renderEditor(grp);
+        });
+      })(i, g);
       d.innerHTML =
-        '<div class="stop-block-head"><div class="stop-block-num">HOLE '+(i+1)+'</div>' +
+        '<div class="stop-block-head"><div style="display:flex;align-items:center;gap:6px;"><span class="stop-drag-handle">≡</span><div class="stop-block-num">HOLE '+(i+1)+'</div></div>' +
         '<button class="btn-remove" onclick="removeStop(\''+g+'\','+i+')">Verwijder stop</button></div>' +
         '<div class="stop-fields-grid">' +
           '<div class="field"><label>Naam</label><input type="text" id="f-'+g+'-'+i+'-name" value="'+safeVal(s.name)+'"></div>' +
