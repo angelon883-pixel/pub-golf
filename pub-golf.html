@@ -420,12 +420,12 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
       Eerste rij = headers:<br>
       <code style="font-size:11px; color:var(--text);">Groep,Naam,Adres,Par,Challenge Titel,Challenge Omschrijving,Foto,Wildcard</code>
     </div>
-    <div id="csv-drop-zone" style="border:2px dashed var(--border); border-radius:10px; padding:24px 16px; text-align:center; margin-bottom:12px; cursor:pointer; transition:border-color .2s, background .2s;" onclick="document.getElementById('csv-file-input').click()">
+    <label for="csv-file-input" id="csv-drop-zone" style="display:block; border:2px dashed var(--border); border-radius:10px; padding:24px 16px; text-align:center; margin-bottom:12px; cursor:pointer; transition:border-color .2s, background .2s;">
       <div style="font-size:28px; margin-bottom:6px;">📂</div>
       <div style="font-size:13px; color:var(--text);">Sleep je CSV-bestand hierheen</div>
       <div style="font-size:11px; color:var(--muted); margin-top:4px;">of klik om te bladeren</div>
       <input type="file" id="csv-file-input" accept=".csv,text/csv" style="display:none" onchange="handleCsvFile(this.files[0])">
-    </div>
+    </label>
     <div id="csv-file-name" style="font-size:12px; color:var(--primary); margin-bottom:8px; display:none;"></div>
     <textarea id="csv-input" style="width:100%; box-sizing:border-box; background:var(--dark); border:1px solid var(--border); border-radius:10px; color:var(--text); font-family:'DM Mono',monospace; font-size:12px; padding:12px; margin-bottom:12px; height:100px; resize:vertical;" placeholder="Of plak CSV-tekst hier…"></textarea>
     <div style="font-size:11px; color:var(--muted); margin-bottom:12px; text-align:left;">⚠️ Stops worden toegevoegd aan de huidige lijst.</div>
