@@ -666,7 +666,7 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
         <div class="score-badge">Strokes: <span id="hdr-score">0</span></div>
       </div>
     </div>
-    <div class="gps-pill">
+    <div class="gps-pill" onclick="retryGPS()" style="cursor:pointer;" title="Tik om GPS opnieuw te proberen">
       <div class="gps-dot" id="gps-dot"></div>
       <span id="gps-txt">searching</span>
     </div>
@@ -972,7 +972,7 @@ function chooseGroup(g) {
   bonusInserted = false;
   bonusPending = false;
   isReferee = false;
-  loadGameState(function(state) {
+  fetchCourse(function() { loadGameState(function(state) {
     if (state && state.stopIdx > 0) {
       openNameModal('Doorgaan bij hole ' + (state.stopIdx + 1) + '? (Ja = doorgaan)', function(ans) {
         if (ans) {
@@ -986,7 +986,7 @@ function chooseGroup(g) {
     } else {
       startGame();
     }
-  });
+  }); });
 }
 
 function goToGroupSelect() { show('screen-group'); }
@@ -1172,10 +1172,18 @@ function startGPS() {
       document.getElementById('gps-txt').textContent = 'active';
       onPosition(pos);
     },
-    function() { document.getElementById('gps-txt').textContent = 'error'; },
+    function(err) {
+      var txt = document.getElementById('gps-txt');
+      document.getElementById('gps-dot').classList.remove('active');
+      if (err && err.code === 1) { txt.textContent = 'geen toegang'; toast('📍 GPS geblokkeerd — sta locatie toe in je browser'); }
+      else if (err && err.code === 2) { txt.textContent = 'geen signaal'; }
+      else if (err && err.code === 3) { txt.textContent = 'zoeken…'; }
+      else { txt.textContent = 'error'; }
+    },
     { enableHighAccuracy:true, maximumAge:5000, timeout:15000 }
   );
 }
+function retryGPS() { stopGPS(); document.getElementById('gps-txt').textContent = 'zoeken…'; startGPS(); }
 function stopGPS() { if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; } }
 
 function onPosition(pos) {
@@ -1386,18 +1394,26 @@ function toggleMapExpand() {
   setTimeout(function() { if (map) map.invalidateSize(); }, 260);
 }
 
-function loadCourseForSession(done) {
+// Fetch the latest course for the current session from Firebase.
+// cb(true) if a course was loaded, cb(false) otherwise.
+function fetchCourse(cb) {
   var db = getFirebase();
-  if (!db || !sessionCode) { done(); return; }
+  if (!db || !sessionCode) { cb(false); return; }
   db.ref('courses/' + sessionCode).once('value').then(function(snap) {
     var data = snap.val();
     if (data) {
-      course = data;
+      course = migrateCourse(data);
       localStorage.setItem('pg_course', JSON.stringify(course));
-      toast('📂 Route voor deze sessie geladen');
-    }
+      cb(true);
+    } else { cb(false); }
+  }).catch(function() { cb(false); });
+}
+
+function loadCourseForSession(done) {
+  fetchCourse(function(ok) {
+    if (ok) toast('📂 Route voor deze sessie geladen');
     done();
-  }).catch(function() { done(); });
+  });
 }
 
 function pushScore() {
@@ -1556,7 +1572,7 @@ function chooseRefereeGroup(g) {
   document.getElementById('ref-group-modal').classList.remove('show');
   isReferee = true;
   refereeGroup = g;
-  startRefereeView();
+  fetchCourse(function() { startRefereeView(); });
 }
 
 function startRefereeView() {
