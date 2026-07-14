@@ -142,8 +142,6 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
 .clue-tag { font-size: 10px; letter-spacing: 4px; text-transform: uppercase; color: var(--primary); margin-bottom: 8px; }
 .clue-title-text { font-family: 'Bebas Neue', sans-serif; font-size: 26px; letter-spacing: 1px; color: var(--secondary); margin-bottom: 6px; }
 .clue-body { font-size: 13px; line-height: 1.7; color: #ddc0a0; }
-.clue-par-note { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); }
-.clue-par-note strong { color: var(--primary); }
 
 /* wildcard */
 .wildcard-banner { display: none; margin-bottom: 12px; padding: 14px 16px; border-radius: 10px; background: linear-gradient(135deg,#1a0f00,#0d0600); border: 1px solid var(--gold); }
@@ -679,7 +677,7 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
       <button onclick="leaveGame()" style="background:none; border:none; color:var(--muted); font-size:20px; cursor:pointer; padding:0; line-height:1;" title="Verlaat spel">✕</button>
       <div>
         <div class="header-group a" id="hdr-group">GROUP A</div>
-        <div class="score-badge">Strokes: <span id="hdr-score">0</span></div>
+        <div class="score-badge">Drankjes: <span id="hdr-score">0</span></div>
       </div>
     </div>
     <div class="gps-pill" onclick="retryGPS()" style="cursor:pointer;" title="Tik om GPS opnieuw te proberen">
@@ -708,7 +706,6 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
   <div class="stop-card">
     <div class="stop-card-header">
       <div class="hole-label" id="hole-label">HOLE 1 / 8</div>
-      <div class="par-label">PAR <span id="par-val">—</span></div>
     </div>
     <div class="stop-card-body">
       <div class="bonus-badge" id="bonus-badge">⭐ BONUS HOLE</div>
@@ -746,7 +743,6 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
           <div class="clue-tag">🎯 Your Challenge</div>
           <div class="clue-title-text" id="clue-title">—</div>
           <div class="clue-body" id="clue-body">—</div>
-          <div class="clue-par-note">Par: <strong id="clue-par">—</strong> strokes</div>
         </div>
       </div>
 
@@ -763,7 +759,7 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
       </div>
 
       <button class="btn-primary" id="btn-challenge-done" onclick="markChallengeDone()" style="background:var(--green); display:none;">✓ Challenge klaar!</button>
-      <button class="btn-primary" id="btn-log" onclick="showScoreArea()">✓ Strokes invullen</button>
+      <button class="btn-primary" id="btn-log" onclick="showScoreArea()">✓ Drankjes invullen</button>
 
       <div class="score-area" id="score-area">
         <span class="score-area-label">Hoeveel drankjes?</span>
@@ -860,7 +856,7 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
   <div class="finish-title">Klaar!</div>
   <div class="finish-sub" id="finish-sub">—</div>
   <div class="final-card">
-    <div class="final-label">Totaal strokes</div>
+    <div class="final-label">Totaal drankjes</div>
     <div class="final-num" id="final-num">0</div>
     <div class="final-rows" id="final-rows"></div>
   </div>
@@ -1058,7 +1054,6 @@ function renderStop() {
   document.getElementById('hole-label').textContent =
     'HOLE ' + (stopIdx+1) + ' / ' + stops.length +
     (totalCh > 1 ? '  ·  ' + totalCh + ' challenges' : '');
-  document.getElementById('par-val').textContent = ch ? ch.par : s.par || '—';
   document.getElementById('stop-name').textContent = s.name;
   document.getElementById('stop-addr').textContent = s.address;
   document.getElementById('hdr-score').textContent = scores.reduce(function(a,b){return a+b;},0);
@@ -1111,18 +1106,13 @@ function renderScorecard() {
     if (s._bonus) cls += ' bonus-row';
     row.className = 'sc-row ' + cls;
     var sc = scores[i] !== undefined ? scores[i] : '—';
-    var diff = '';
-    if (scores[i] !== undefined) {
-      var sPar = s.challenges ? s.challenges[0].par : (s.par || 2);
-      var d = scores[i] - sPar;
-      diff = d > 0 ? '+'+d : d === 0 ? 'par' : String(d);
-    }
-    var sPar0 = s.challenges ? s.challenges[0].par : (s.par || 2);
+    var nCh = (s.challenges || []).length;
+    var subText = (nCh > 1 ? nCh + ' challenges' : '') + (s._bonus ? (nCh > 1 ? ' · ' : '') + 'bonus' : '');
     var icon = i < stopIdx ? '✓' : s._bonus ? '⭐' : String(i+1);
     row.innerHTML =
       '<div class="sc-num">' + icon + '</div>' +
       '<div class="sc-info"><div class="sc-name">' + s.name + '</div>' +
-      '<div class="sc-sub">Par ' + sPar0 + (diff ? ' · '+diff : '') + (s._bonus ? ' · bonus' : '') + '</div></div>' +
+      (subText ? '<div class="sc-sub">' + subText + '</div>' : '') + '</div>' +
       '<div class="sc-score">' + sc + '</div>';
     box.appendChild(row);
   });
@@ -1791,7 +1781,6 @@ function renderChallengeView() {
 
   document.getElementById('clue-title').textContent = ch ? ch.clueTitle : s.clueTitle || '—';
   document.getElementById('clue-body').textContent = ch ? ch.challenge : s.challenge || '—';
-  document.getElementById('clue-par').textContent = ch ? ch.par : s.par || '—';
 
   // nav + dots
   var nav = document.getElementById('challenge-nav');
@@ -1984,13 +1973,11 @@ function showScoreArea() {
   }
   var grid = document.getElementById('score-grid');
   grid.innerHTML = '';
-  var sPar = s.challenges ? s.challenges[0].par : (s.par || 2);
-  for (var n = 1; n <= sPar + 3; n++) {
+  for (var n = 1; n <= 8; n++) {
     (function(num) {
       var chip = document.createElement('button');
       chip.className = 'score-chip';
-      var d = num - sPar;
-      chip.innerHTML = num + '<sub>' + (d===0?'par':d>0?'+'+d:d) + '</sub>';
+      chip.innerHTML = String(num);
       chip.onclick = function() {
         document.querySelectorAll('.score-chip').forEach(function(c){c.classList.remove('selected');});
         chip.classList.add('selected');
@@ -2004,7 +1991,7 @@ function showScoreArea() {
 }
 
 function confirmScore() {
-  if (pickedScore === null) { toast('Kies eerst een aantal strokes!'); return; }
+  if (pickedScore === null) { toast('Kies eerst het aantal drankjes!'); return; }
   scores[stopIdx] = pickedScore;
   pushScore();
   stopIdx++;
@@ -2047,7 +2034,9 @@ function skipBonus() {
 function advanceStop() {
   challengeIdx = 0;
   if (stopIdx >= getStops().length) {
-    if (earnedLetters.length > 1) { openPuzzle(); } else { finishGame(); }
+    var puz = course.puzzle || {};
+    var hasAnswer = puz.answer && puz.answer.trim();
+    if (hasAnswer || earnedLetters.length > 1) { openPuzzle(); } else { finishGame(); }
     return;
   }
   renderStop();
@@ -2061,13 +2050,10 @@ function finishGame() {
   stopSync();
   var stops = getStops();
   var total = scores.reduce(function(a,b){return a+b;},0);
-  var par = stops.reduce(function(a,s){ return a + (s.challenges ? s.challenges[0].par : (s.par||2)); }, 0);
-  var d = total - par;
-  document.getElementById('finish-sub').textContent = (group === 'A' ? (course.nameA||'Team A') : (course.nameB||'Team B')) + ' · ' + (d>0?'+'+d:d===0?'gelijk aan par':String(d)) + ' vs par';
+  document.getElementById('finish-sub').textContent = (group === 'A' ? (course.nameA||'Team A') : (course.nameB||'Team B')) + ' · ' + total + ' drankjes';
   document.getElementById('final-num').textContent = total;
   document.getElementById('final-rows').innerHTML = stops.map(function(s,i){
-    var sp = s.challenges ? s.challenges[0].par : (s.par||2);
-    return '<div class="final-row"><span>' + (s._bonus?'⭐ ':'')+s.name+'</span><span>'+(scores[i]!==undefined?scores[i]:'—')+' / par '+sp+'</span></div>';
+    return '<div class="final-row"><span>' + (s._bonus?'⭐ ':'')+s.name+'</span><span>'+(scores[i]!==undefined?scores[i]:'—')+'</span></div>';
   }).join('');
 
   // photo strip
@@ -2418,7 +2404,6 @@ function renderEditor(g) {
               '<label style="display:flex;align-items:center;justify-content:center;width:38px;height:38px;background:var(--card);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:16px;" title="GIF uploaden">📁' +
                 '<input type="file" accept="image/gif,image/webp,image/png" style="display:none;" onchange="handleGifUpload(this,\'f-'+g+'-'+i+'-'+ci+'-gifUrl\')">' +
               '</label></div></div>' +
-            '<div class="field"><label>Par</label><input type="number" min="1" max="9" id="f-'+g+'-'+i+'-'+ci+'-par" value="'+(ch.par||2)+'"></div>' +
             '<div class="field"><div class="photo-toggle-row"><span class="photo-toggle-label">📸 Foto</span><label class="toggle-switch"><input type="checkbox" id="f-'+g+'-'+i+'-'+ci+'-photo"'+(ch.photo?' checked':'')+'><span class="toggle-track"></span></label></div></div>' +
             '<div class="field"><div class="wildcard-toggle-row"><span class="wildcard-toggle-label">🃏 Wildcard</span><label class="toggle-switch"><input type="checkbox" id="f-'+g+'-'+i+'-'+ci+'-wildcard"'+(ch.wildcard?' checked':'')+'><span class="toggle-track"></span></label></div></div>' +
           '</div>' +
@@ -2595,7 +2580,6 @@ function renderBonusEditor(suffix) {
         '<div><label>Latitude</label><input type="number" step="0.000001" id="bonus-lat-'+suffix+'" value="'+(b.lat||52.3702)+'"></div>' +
         '<div><label>Longitude</label><input type="number" step="0.000001" id="bonus-lng-'+suffix+'" value="'+(b.lng||4.8952)+'"></div>' +
       '</div>' +
-      '<div class="field"><label>Par</label><input type="number" min="1" max="9" id="bonus-par-'+suffix+'" value="'+(b.par||2)+'"></div>' +
       '<div class="field"><label>Challenge</label><textarea id="bonus-challenge-'+suffix+'">'+safeText(b.challenge||'')+'</textarea></div>' +
     '</div>' +
   '</div>';
