@@ -2355,7 +2355,7 @@ function renderEditor(g) {
         '<div class="stop-fields-grid">' +
           '<div class="field"><label>Naam</label><input type="text" id="f-'+g+'-'+i+'-name" value="'+safeVal(s.name)+'"></div>' +
           '<div class="field full"><label>Adres</label><div class="addr-wrap" style="position:relative;"><div style="display:flex; gap:8px;">' +
-            '<input type="text" id="f-'+g+'-'+i+'-address" value="'+safeVal(s.address)+'" style="flex:1;" autocomplete="off" oninput="addrInput(this,\''+g+'\','+i+')" onblur="addrBlur(\''+g+'\','+i+')">' +
+            '<input type="text" id="f-'+g+'-'+i+'-address" value="'+safeVal(s.address)+'" style="flex:1;" autocomplete="off" oninput="addrInput(this,\''+g+'\','+i+')" onblur="addrBlur(this)">' +
             '<button class="btn-session-join" style="padding:10px 14px; font-size:13px; white-space:nowrap;" onclick="geocodeStop(\''+g+'\','+i+')">🔍 Zoek</button>' +
           '</div><div class="addr-suggest" id="addr-sug-'+g+'-'+i+'"></div></div></div>' +
           '<div class="field"><label>Latitude</label><input type="number" step="0.000001" id="f-'+g+'-'+i+'-lat" value="'+s.lat+'"></div>' +
@@ -2595,7 +2595,10 @@ var addrSugCache = {};
 function addrInput(input, g, i) {
   var q = input.value.trim();
   if (addrTimer) clearTimeout(addrTimer);
-  var box = document.getElementById('addr-sug-' + g + '-' + i);
+  // Scope to the wrapper of the input that fired — element ids are duplicated
+  // across the mobile + desktop editor copies, so getElementById is unreliable.
+  var wrap = input.closest('.addr-wrap');
+  var box = wrap ? wrap.querySelector('.addr-suggest') : null;
   if (!box) return;
   if (q.length < 3) { box.innerHTML = ''; box.classList.remove('open'); return; }
   addrTimer = setTimeout(function() {
@@ -2610,9 +2613,10 @@ function addrInput(input, g, i) {
   }, 350);
 }
 
-function addrBlur(g, i) {
+function addrBlur(input) {
   setTimeout(function() {
-    var box = document.getElementById('addr-sug-' + g + '-' + i);
+    var wrap = input.closest ? input.closest('.addr-wrap') : null;
+    var box = wrap ? wrap.querySelector('.addr-suggest') : null;
     if (box) box.classList.remove('open');
   }, 180);
 }
