@@ -275,6 +275,11 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
 .stop-block.drag-after  { border-bottom: 3px solid var(--green); }
 .stop-block.drag-merge  { border-color: var(--gold); border-style: dashed; background: #1a1000; }
 .stop-drag-handle { cursor: grab; font-size: 20px; color: var(--muted); padding: 0 6px 0 0; user-select: none; }
+.addr-suggest { display:none; position:absolute; left:0; right:0; top:100%; z-index:50; background: var(--card); border: 1px solid var(--border); border-radius: 8px; margin-top: 4px; max-height: 220px; overflow-y: auto; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
+.addr-suggest.open { display:block; }
+.addr-sug-item { padding: 10px 12px; font-size: 13px; color: var(--text); cursor: pointer; border-bottom: 1px solid var(--border); line-height: 1.4; }
+.addr-sug-item:last-child { border-bottom: none; }
+.addr-sug-item:hover { background: var(--primary); color: #000; }
 .stop-block-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .stop-block-num { font-family: 'Bebas Neue', sans-serif; font-size: 18px; color: var(--muted); }
 .btn-remove { background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--secondary); font-size: 11px; padding: 4px 10px; cursor: pointer; font-family: 'DM Mono', monospace; }
@@ -2349,10 +2354,10 @@ function renderEditor(g) {
         '<button class="btn-remove" onclick="removeStop(\''+g+'\','+i+')">Verwijder stop</button></div>' +
         '<div class="stop-fields-grid">' +
           '<div class="field"><label>Naam</label><input type="text" id="f-'+g+'-'+i+'-name" value="'+safeVal(s.name)+'"></div>' +
-          '<div class="field full"><label>Adres</label><div style="display:flex; gap:8px;">' +
-            '<input type="text" id="f-'+g+'-'+i+'-address" value="'+safeVal(s.address)+'" style="flex:1;">' +
+          '<div class="field full"><label>Adres</label><div class="addr-wrap" style="position:relative;"><div style="display:flex; gap:8px;">' +
+            '<input type="text" id="f-'+g+'-'+i+'-address" value="'+safeVal(s.address)+'" style="flex:1;" autocomplete="off" oninput="addrInput(this,\''+g+'\','+i+')" onblur="addrBlur(\''+g+'\','+i+')">' +
             '<button class="btn-session-join" style="padding:10px 14px; font-size:13px; white-space:nowrap;" onclick="geocodeStop(\''+g+'\','+i+')">🔍 Zoek</button>' +
-          '</div></div>' +
+          '</div><div class="addr-suggest" id="addr-sug-'+g+'-'+i+'"></div></div></div>' +
           '<div class="field"><label>Latitude</label><input type="number" step="0.000001" id="f-'+g+'-'+i+'-lat" value="'+s.lat+'"></div>' +
           '<div class="field"><label>Longitude</label><input type="number" step="0.000001" id="f-'+g+'-'+i+'-lng" value="'+s.lng+'"></div>' +
         '</div>' +
@@ -2471,10 +2476,10 @@ function renderBonusEditor(suffix) {
     '<div class="bonus-fields'+(enabled?' visible':'')+'" id="bonus-fields-'+suffix+'">' +
       '<div class="field"><label>Na hole #</label><input type="number" min="1" max="20" id="bonus-trigger-'+suffix+'" value="'+(b.triggerAfterHole||4)+'"></div>' +
       '<div class="field"><label>Naam</label><input type="text" id="bonus-name-'+suffix+'" value="'+safeVal(b.name||'')+'"></div>' +
-      '<div class="field"><label>Adres</label><div style="display:flex; gap:8px;">' +
-        '<input type="text" id="bonus-addr-'+suffix+'" value="'+safeVal(b.address||'')+'" style="flex:1;">' +
+      '<div class="field"><label>Adres</label><div class="addr-wrap" style="position:relative;"><div style="display:flex; gap:8px;">' +
+        '<input type="text" id="bonus-addr-'+suffix+'" value="'+safeVal(b.address||'')+'" style="flex:1;" autocomplete="off" oninput="addrInputBonus(this,\''+suffix+'\')" onblur="addrBlurBonus(\''+suffix+'\')">' +
         '<button class="btn-session-join" style="padding:10px 14px; font-size:13px; white-space:nowrap;" onclick="geocodeBonus(\''+suffix+'\')">🔍 Zoek</button>' +
-      '</div></div>' +
+      '</div><div class="addr-suggest" id="addr-sug-bonus-'+suffix+'"></div></div></div>' +
       '<div class="field coords-pair">' +
         '<div><label>Latitude</label><input type="number" step="0.000001" id="bonus-lat-'+suffix+'" value="'+(b.lat||52.3702)+'"></div>' +
         '<div><label>Longitude</label><input type="number" step="0.000001" id="bonus-lng-'+suffix+'" value="'+(b.lng||4.8952)+'"></div>' +
@@ -2570,6 +2575,97 @@ function geocodeAddress(address) {
       if (!results || !results[0]) throw new Error('not found');
       return { lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon) };
     });
+}
+
+// ── ADDRESS AUTOCOMPLETE ──────────────────────
+function searchAddresses(query) {
+  var url = 'https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=5&q=' + encodeURIComponent(query);
+  return fetch(url, { headers: { 'Accept-Language': 'nl' } })
+    .then(function(r) { return r.json(); })
+    .then(function(results) {
+      return (results || []).map(function(r) {
+        return { label: r.display_name, lat: parseFloat(r.lat), lng: parseFloat(r.lon) };
+      });
+    });
+}
+
+var addrTimer = null;
+var addrSugCache = {};
+
+function addrInput(input, g, i) {
+  var q = input.value.trim();
+  if (addrTimer) clearTimeout(addrTimer);
+  var box = document.getElementById('addr-sug-' + g + '-' + i);
+  if (!box) return;
+  if (q.length < 3) { box.innerHTML = ''; box.classList.remove('open'); return; }
+  addrTimer = setTimeout(function() {
+    searchAddresses(q).then(function(items) {
+      if (!items.length) { box.innerHTML = ''; box.classList.remove('open'); return; }
+      addrSugCache[g + '-' + i] = items;
+      box.innerHTML = items.map(function(it, k) {
+        return '<div class="addr-sug-item" onmousedown="pickAddr(\'' + g + '\',' + i + ',' + k + ')">' + safeVal(it.label) + '</div>';
+      }).join('');
+      box.classList.add('open');
+    }).catch(function(){});
+  }, 350);
+}
+
+function addrBlur(g, i) {
+  setTimeout(function() {
+    var box = document.getElementById('addr-sug-' + g + '-' + i);
+    if (box) box.classList.remove('open');
+  }, 180);
+}
+
+function pickAddr(g, i, k) {
+  var it = (addrSugCache[g + '-' + i] || [])[k];
+  if (!it) return;
+  course[g][i].address = it.label;
+  course[g][i].lat = it.lat;
+  course[g][i].lng = it.lng;
+  renderEditor(g);
+  toast('📍 Adres & coördinaten ingesteld');
+}
+
+function addrInputBonus(input, suffix) {
+  var q = input.value.trim();
+  if (addrTimer) clearTimeout(addrTimer);
+  var box = document.getElementById('addr-sug-bonus-' + suffix);
+  if (!box) return;
+  if (q.length < 3) { box.innerHTML = ''; box.classList.remove('open'); return; }
+  addrTimer = setTimeout(function() {
+    searchAddresses(q).then(function(items) {
+      if (!items.length) { box.innerHTML = ''; box.classList.remove('open'); return; }
+      addrSugCache['bonus-' + suffix] = items;
+      box.innerHTML = items.map(function(it, k) {
+        return '<div class="addr-sug-item" onmousedown="pickBonusAddr(\'' + suffix + '\',' + k + ')">' + safeVal(it.label) + '</div>';
+      }).join('');
+      box.classList.add('open');
+    }).catch(function(){});
+  }, 350);
+}
+
+function addrBlurBonus(suffix) {
+  setTimeout(function() {
+    var box = document.getElementById('addr-sug-bonus-' + suffix);
+    if (box) box.classList.remove('open');
+  }, 180);
+}
+
+function pickBonusAddr(suffix, k) {
+  var it = (addrSugCache['bonus-' + suffix] || [])[k];
+  if (!it) return;
+  ['mobile', 'desktop'].forEach(function(sfx) {
+    var a = document.getElementById('bonus-addr-' + sfx);
+    var la = document.getElementById('bonus-lat-' + sfx);
+    var lo = document.getElementById('bonus-lng-' + sfx);
+    if (a) a.value = it.label;
+    if (la) la.value = it.lat.toFixed(6);
+    if (lo) lo.value = it.lng.toFixed(6);
+  });
+  var box = document.getElementById('addr-sug-bonus-' + suffix);
+  if (box) box.classList.remove('open');
+  toast('📍 Adres & coördinaten ingesteld');
 }
 
 function geocodeStop(g, i) {
