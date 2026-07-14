@@ -1010,7 +1010,11 @@ function chooseGroup(g) {
   }); });
 }
 
-function goToGroupSelect() { show('screen-group'); }
+function goToGroupSelect() {
+  // Referee entry only makes sense when a referee code is configured
+  document.getElementById('referee-entry').style.display = course.refereeCode ? '' : 'none';
+  show('screen-group');
+}
 
 function goToSessionMenu() {
   var title = document.getElementById('session-menu-title');
