@@ -126,6 +126,8 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
 .clue-locked-view { padding: 20px; text-align: center; background: #0d0400; display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .clue-locked-view .lock { font-size: 26px; opacity: 0.35; }
 .clue-locked-view p { font-size: 12px; color: var(--muted); }
+.btn-manual-unlock { margin-top: 12px; padding: 10px 16px; background: transparent; border: 1px dashed var(--border); border-radius: 8px; color: var(--muted); font-family: 'DM Mono', monospace; font-size: 12px; cursor: pointer; }
+.btn-manual-unlock:hover { border-color: var(--primary); color: var(--primary); }
 .clue-locked-view.hidden { display: none; }
 .clue-open-view { display: none; padding: 18px; background: linear-gradient(135deg,#1f0800,#110500); touch-action: pan-y; }
 .clue-open-view.visible { display: block; }
@@ -676,7 +678,7 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
     <div style="display:flex; align-items:center; gap:10px;">
       <button onclick="leaveGame()" style="background:none; border:none; color:var(--muted); font-size:20px; cursor:pointer; padding:0; line-height:1;" title="Verlaat spel">✕</button>
       <div>
-        <div class="header-group a" id="hdr-group">GROUP A</div>
+        <div class="header-group a" id="hdr-group" onclick="renameTeam()" style="cursor:pointer;" title="Tik om teamnaam aan te passen">GROUP A ✎</div>
         <div class="score-badge">Letters: <span id="hdr-score">0</span></div>
       </div>
     </div>
@@ -732,6 +734,7 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
         <div class="clue-locked-view" id="clue-locked">
           <div class="lock">🔒</div>
           <p>Clue unlocks when you arrive</p>
+          <button class="btn-manual-unlock" onclick="manualUnlock()">🔓 Ik ben er (handmatig openen)</button>
         </div>
         <div class="clue-open-view" id="clue-open">
           <div class="challenge-dots" id="challenge-dots"></div>
@@ -1265,13 +1268,36 @@ function updateTravelTime(dist) {
   }
 }
 
-function startGame() {
-  gameStartTime = Date.now();
+function updateTeamHeader() {
   var hdr = document.getElementById('hdr-group');
-  hdr.textContent = (group === 'A' ? course.nameA : course.nameB) || ('GROUP ' + group);
+  hdr.textContent = ((group === 'A' ? course.nameA : course.nameB) || ('GROUP ' + group)) + ' ✎';
   hdr.className = 'header-group ' + group.toLowerCase();
   document.getElementById('ls-name-a').textContent = course.nameA || 'Team A';
   document.getElementById('ls-name-b').textContent = course.nameB || 'Team B';
+}
+
+// Rename the current team from the game screen.
+function renameTeam() {
+  var current = (group === 'A' ? course.nameA : course.nameB) || '';
+  openNameModal('Nieuwe teamnaam', function(name) {
+    name = (name || '').trim();
+    if (!name) return;
+    if (group === 'A') course.nameA = name; else course.nameB = name;
+    localStorage.setItem('pg_course', JSON.stringify(course));
+    if (sessionCode) {
+      var db = getFirebase();
+      if (db) db.ref('courses/' + sessionCode + '/name' + group).set(name);
+    }
+    updateTeamHeader();
+    toast('✅ Teamnaam aangepast');
+  });
+  var inp = document.getElementById('name-modal-input');
+  if (inp) inp.value = current;
+}
+
+function startGame() {
+  gameStartTime = Date.now();
+  updateTeamHeader();
   renderStop();
   renderScorecard();
   show('screen-game');
@@ -1756,6 +1782,16 @@ function triggerArrivalAlarm() {
 }
 
 // ── CLUE REVEAL ANIMATION ─────────────────────
+// Manual arrival override (for flaky/blocked GPS).
+function manualUnlock() {
+  if (arrived) return;
+  var s = getStops()[stopIdx];
+  if (!s) return;
+  arrived = true;
+  unlockClue(s);
+  checkProximityWildcards();
+}
+
 function unlockClue(s) {
   triggerArrivalAlarm();
   challengeIdx = 0;
@@ -1994,13 +2030,13 @@ function showLetterReveal(letter, gifUrl, cb, skipPush) {
   prog.style.transition = 'none';
   prog.style.width = '100%';
   setTimeout(function() {
-    prog.style.transition = 'width 4s linear';
+    prog.style.transition = 'width 3s linear';
     prog.style.width = '0%';
   }, 50);
   setTimeout(function() {
     el.classList.remove('show');
     if (cb) cb();
-  }, 4000);
+  }, 3000);
 }
 
 function showScoreArea() {
