@@ -677,7 +677,7 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
       <button onclick="leaveGame()" style="background:none; border:none; color:var(--muted); font-size:20px; cursor:pointer; padding:0; line-height:1;" title="Verlaat spel">✕</button>
       <div>
         <div class="header-group a" id="hdr-group">GROUP A</div>
-        <div class="score-badge">Drankjes: <span id="hdr-score">0</span></div>
+        <div class="score-badge">Letters: <span id="hdr-score">0</span></div>
       </div>
     </div>
     <div class="gps-pill" onclick="retryGPS()" style="cursor:pointer;" title="Tik om GPS opnieuw te proberen">
@@ -856,7 +856,7 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
   <div class="finish-title">Klaar!</div>
   <div class="finish-sub" id="finish-sub">—</div>
   <div class="final-card">
-    <div class="final-label">Totaal drankjes</div>
+    <div class="final-label">Verzamelde letters</div>
     <div class="final-num" id="final-num">0</div>
     <div class="final-rows" id="final-rows"></div>
   </div>
@@ -1056,7 +1056,7 @@ function renderStop() {
     (totalCh > 1 ? '  ·  ' + totalCh + ' challenges' : '');
   document.getElementById('stop-name').textContent = s.name;
   document.getElementById('stop-addr').textContent = s.address;
-  document.getElementById('hdr-score').textContent = scores.reduce(function(a,b){return a+b;},0);
+  document.getElementById('hdr-score').textContent = earnedLetters.length;
 
   // bonus badge
   var bb = document.getElementById('bonus-badge');
@@ -1439,7 +1439,7 @@ function pushScore() {
   if (!myRef) return;
   myRef.update({
     g: group,
-    score: scores.reduce(function(a,b){return a+b;},0),
+    score: earnedLetters.length,
     hole: stopIdx + 1,
     total: getStops().length,
     ts: Date.now()
@@ -1468,7 +1468,7 @@ function startSync() {
   peerRef = db.ref('sessions/' + sessionCode + '/players');
   peerRef.on('value', function(snap) {
     var data = snap.val();
-    var myScore = scores.reduce(function(a,b){return a+b;},0);
+    var myScore = earnedLetters.length;
     var myG = group;
     var myKey = 'ls-score-' + myG.toLowerCase();
     document.getElementById(myKey).textContent = myScore;
@@ -1490,11 +1490,11 @@ function startSync() {
     document.getElementById(theirKey).textContent = theirEntry.score;
     document.getElementById('ls-hole-' + theirG.toLowerCase()).textContent = 'hole ' + theirEntry.hole;
 
-    // highlight who's winning (lower = better)
+    // highlight who's winning (more letters = better)
     var myEl = document.getElementById('ls-team-' + myG.toLowerCase());
     var theirEl = document.getElementById('ls-team-' + theirG.toLowerCase());
-    myEl.classList.toggle('winning', myScore <= theirEntry.score);
-    theirEl.classList.toggle('winning', theirEntry.score < myScore);
+    myEl.classList.toggle('winning', myScore >= theirEntry.score);
+    theirEl.classList.toggle('winning', theirEntry.score > myScore);
     document.getElementById('live-sync-dot').classList.add('synced');
 
     // show other group's live location on the map
@@ -1550,17 +1550,14 @@ function listenForRefereeApproval() {
       // earnedLetters already includes the awarded letters (set by the referee)
       earnedLetters = d.earnedLetters || earnedLetters;
       var letters = d.awardedLetters || [];
-      // map each letter back to its challenge's GIF
-      var chs = (getStops()[stopIdx] || {}).challenges || [];
-      var gifByLetter = {};
-      chs.forEach(function(c) { if (c && c.letter) gifByLetter[c.letter] = c.letterGifUrl; });
+      var gifs = d.awardedGifs || [];
       var i = 0;
       (function revealNext() {
         if (i < letters.length) {
-          var L = letters[i]; i++;
-          showLetterReveal(L, gifByLetter[L] || '', revealNext, true);
+          var L = letters[i], G = gifs[i] || ''; i++;
+          showLetterReveal(L, G, revealNext, true);
         } else {
-          showScoreArea();
+          finishStop();
         }
       })();
     } else if (d.status === 'rejected') {
@@ -1637,17 +1634,22 @@ function renderRefereeView(d) {
   document.getElementById('ref-challenge-num').textContent =
     multi ? chs.length + ' challenges — beoordeel samen' : '';
 
-  // Show all challenges of the stop
+  // Letters this stop would award (from challenge letters or the answer word)
+  var pairs = stop ? lettersForStop(stop, (d && d.earnedLetters || []).length) : [];
+
+  // Show all challenges of the stop, each with the letter it would award
   if (multi) {
     document.getElementById('ref-clue-title').textContent = '';
     document.getElementById('ref-clue-body').innerHTML = chs.map(function(c, i) {
+      var L = pairs[i] ? pairs[i].letter : '';
       return '<div style="margin-bottom:10px;"><strong style="color:var(--secondary);">' + (i+1) + '. ' + safeVal(c.clueTitle || '') +
-        (c.letter ? ' <span style="color:var(--gold);">[' + c.letter + ']</span>' : '') +
+        (L ? ' <span style="color:var(--gold);">[' + L + ']</span>' : '') +
         (c.photo ? ' 📸' : '') + '</strong><br>' + safeVal(c.challenge || '') + '</div>';
     }).join('');
   } else {
     var ch0 = chs[0] || null;
-    document.getElementById('ref-clue-title').textContent = ch0 ? ch0.clueTitle : '—';
+    var L0 = pairs[0] ? pairs[0].letter : '';
+    document.getElementById('ref-clue-title').textContent = (ch0 ? ch0.clueTitle : '—') + (L0 ? '  [' + L0 + ']' : '');
     document.getElementById('ref-clue-body').textContent = ch0 ? ch0.challenge : '—';
   }
 
@@ -1666,18 +1668,22 @@ function renderRefereeView(d) {
     statusEl.className = 'referee-status pending';
     statusEl.textContent = '⚡ Team klaar! Beoordeel nu';
     panel.style.display = 'block';
-    // one chip per challenge that has a letter — pre-selected, tap to deselect
+    // one chip per challenge that awards a letter — pre-selected, tap to deselect
     row.innerHTML = '';
-    chs.forEach(function(c, i) {
-      if (!c.letter) return;
+    pairs.forEach(function(p, i) {
+      if (!p.letter) return;
       var chip = document.createElement('div');
       chip.className = 'letter-award-chip sel';
-      chip.textContent = c.letter;
-      chip.dataset.letter = c.letter;
+      chip.textContent = p.letter;
+      chip.dataset.letter = p.letter;
+      chip.dataset.gif = p.gif || '';
       chip.title = 'Challenge ' + (i+1);
       chip.onclick = function() { chip.classList.toggle('sel'); };
       row.appendChild(chip);
     });
+    if (!row.children.length) {
+      row.innerHTML = '<div style="font-size:12px;color:var(--muted);">Geen letters ingesteld — voeg een antwoordwoord toe in de editor (Eindspel).</div>';
+    }
   } else {
     statusEl.className = 'referee-status waiting';
     statusEl.textContent = status === 'approved' ? '✓ Goedgekeurd' : status === 'rejected' ? '✕ Afgekeurd' : 'Wachten op team…';
@@ -1691,9 +1697,10 @@ function earnedLettersForGroup(d) {
 
 function refereeApprove() {
   var db = getFirebase(); if (!db || !sessionCode) return;
-  var selected = [];
+  var selected = [], gifs = [];
   document.querySelectorAll('#letter-award-row .letter-award-chip.sel').forEach(function(c) {
     selected.push(c.dataset.letter);
+    gifs.push(c.dataset.gif || '');
   });
   var ref = db.ref('sessions/' + sessionCode + '/state/' + refereeGroup);
   ref.once('value').then(function(snap) {
@@ -1702,6 +1709,7 @@ function refereeApprove() {
     ref.update({
       status: 'approved',
       awardedLetters: selected,
+      awardedGifs: gifs,
       earnedLetters: existing.concat(selected)
     });
     toast('✅ Goedgekeurd' + (selected.length ? ' · ' + selected.join('') : ''));
@@ -1915,7 +1923,9 @@ function markChallengeDone() {
       pushChallengeState('pending');
       listenForRefereeApproval();
     } else {
-      revealAllLetters(chs, function() { showScoreArea(); });
+      // no referee watching: award this stop's letters directly
+      var pairs = lettersForStop(s, earnedLetters.length);
+      revealPairs(pairs, function() { finishStop(); });
     }
   });
 }
@@ -1929,15 +1939,46 @@ function refereeIsPresent(cb) {
     .catch(function() { cb(false); });
 }
 
-// Reveal each challenge's letter in sequence (skips challenges without a letter).
-function revealAllLetters(chs, done) {
+// Which letters a stop awards, aligned to its challenges.
+// A challenge's own letter takes priority; otherwise the next unused letter of
+// the puzzle answer is used (so you only need to set the answer word).
+// Returns array of { letter, gif } (letter may be '' if none available).
+function lettersForStop(stop, earnedCount) {
+  var ans = ((course.puzzle || {}).answer || '').toUpperCase().replace(/[^A-Z]/g, '');
+  var derived = earnedCount;
+  return (stop.challenges || []).map(function(c) {
+    if (c && c.letter) return { letter: c.letter, gif: c.letterGifUrl || '' };
+    if (ans && derived < ans.length) { var L = ans[derived]; derived++; return { letter: L, gif: (c && c.letterGifUrl) || '' }; }
+    return { letter: '', gif: '' };
+  });
+}
+
+// Reveal a list of {letter, gif} pairs in sequence (skips empty).
+function revealPairs(pairs, done) {
   var i = 0;
   (function next() {
-    while (i < chs.length && !(chs[i] && chs[i].letter)) i++;
-    if (i >= chs.length) { done(); return; }
-    var ch = chs[i]; i++;
-    showLetterReveal(ch.letter, ch.letterGifUrl, next);
+    while (i < pairs.length && !(pairs[i] && pairs[i].letter)) i++;
+    if (i >= pairs.length) { done(); return; }
+    var p = pairs[i]; i++;
+    showLetterReveal(p.letter, p.gif, next);
   })();
+}
+
+// Finish the current stop and move on (no score entry).
+function finishStop() {
+  stopIdx++;
+  pushScore();
+  pushGameState();
+  var bonus = course.bonus;
+  if (bonus && bonus.enabled && !bonusInserted && stopIdx === bonus.triggerAfterHole) {
+    bonusPending = true;
+    document.getElementById('bonus-hole-name').textContent = bonus.name;
+    document.getElementById('bonus-hole-addr').textContent = bonus.address;
+    document.getElementById('bonus-hole-challenge').textContent = bonus.challenge;
+    show('screen-bonus');
+    return;
+  }
+  advanceStop();
 }
 
 function showLetterReveal(letter, gifUrl, cb, skipPush) {
@@ -2049,11 +2090,11 @@ function finishGame() {
   stopGPS();
   stopSync();
   var stops = getStops();
-  var total = scores.reduce(function(a,b){return a+b;},0);
-  document.getElementById('finish-sub').textContent = (group === 'A' ? (course.nameA||'Team A') : (course.nameB||'Team B')) + ' · ' + total + ' drankjes';
-  document.getElementById('final-num').textContent = total;
+  document.getElementById('finish-sub').textContent = (group === 'A' ? (course.nameA||'Team A') : (course.nameB||'Team B')) + ' · ' + earnedLetters.length + ' letters verzameld';
+  document.getElementById('final-num').textContent = earnedLetters.join('') || '—';
   document.getElementById('final-rows').innerHTML = stops.map(function(s,i){
-    return '<div class="final-row"><span>' + (s._bonus?'⭐ ':'')+s.name+'</span><span>'+(scores[i]!==undefined?scores[i]:'—')+'</span></div>';
+    var done = i < stopIdx;
+    return '<div class="final-row"><span>' + (s._bonus?'⭐ ':'')+s.name+'</span><span>'+(done?'✓':'—')+'</span></div>';
   }).join('');
 
   // photo strip
