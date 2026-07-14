@@ -590,10 +590,11 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
   </div>
   <div id="referee-entry" style="margin-top:8px; width:100%; max-width:280px;">
     <div class="session-or">— of als scheidsrechter —</div>
-    <div class="session-join-row" style="margin-bottom:8px;">
+    <div class="session-join-row" id="referee-code-row" style="margin-bottom:8px;">
       <input class="session-join-input" id="referee-code-input" maxlength="4" placeholder="CODE" oninput="this.value=this.value.toUpperCase()" style="font-size:22px;">
       <button class="btn-session-join" onclick="enterRefereeMode()">🎯 Scheids</button>
     </div>
+    <button class="group-btn group-a" id="referee-nocode-btn" style="display:none; width:100%;" onclick="enterRefereeMode()"><span class="emoji">🎯</span>SCHEIDSRECHTER</button>
   </div>
 </div>
 
@@ -1011,8 +1012,11 @@ function chooseGroup(g) {
 }
 
 function goToGroupSelect() {
-  // Referee entry only makes sense when a referee code is configured
-  document.getElementById('referee-entry').style.display = course.refereeCode ? '' : 'none';
+  // Referee is always accessible; only require a code if one is configured
+  var hasCode = !!course.refereeCode;
+  document.getElementById('referee-entry').style.display = '';
+  document.getElementById('referee-code-row').style.display = hasCode ? '' : 'none';
+  document.getElementById('referee-nocode-btn').style.display = hasCode ? 'none' : '';
   show('screen-group');
 }
 
@@ -1580,10 +1584,11 @@ function listenForRefereeApproval() {
 
 // ── REFEREE MODE ───────────────────────────────
 function enterRefereeMode() {
-  var input = document.getElementById('referee-code-input').value.trim().toUpperCase();
-  if (!input) { toast('Voer de scheidsrechter-code in'); return; }
-  if (!course.refereeCode || input !== course.refereeCode.toUpperCase()) {
-    toast('❌ Verkeerde code'); return;
+  // If a referee code is configured, require it; otherwise allow direct access
+  if (course.refereeCode) {
+    var input = document.getElementById('referee-code-input').value.trim().toUpperCase();
+    if (!input) { toast('Voer de scheidsrechter-code in'); return; }
+    if (input !== course.refereeCode.toUpperCase()) { toast('❌ Verkeerde code'); return; }
   }
   canEditCourse = true;
   document.getElementById('ref-group-name-a').textContent = course.nameA || 'Team A';
@@ -1598,10 +1603,22 @@ function chooseRefereeGroup(g) {
   fetchCourse(function() { startRefereeView(); });
 }
 
+var refPresenceRef = null;
+
 function startRefereeView() {
   document.getElementById('referee-team-label').textContent =
     '👥 ' + (refereeGroup === 'A' ? (course.nameA || 'Team A') : (course.nameB || 'Team B'));
   show('screen-referee');
+  // Announce presence so players in this group route through referee approval,
+  // regardless of whether a referee code is set.
+  if (sessionCode) {
+    var db = getFirebase();
+    if (db) {
+      refPresenceRef = db.ref('sessions/' + sessionCode + '/refPresence/' + refereeGroup);
+      refPresenceRef.set(Date.now());
+      refPresenceRef.onDisconnect().remove();
+    }
+  }
   listenRefereeState();
 }
 
@@ -1758,9 +1775,7 @@ function unlockClue(s) {
     // One submit button for the whole stop
     var btn = document.getElementById('btn-challenge-done');
     var multi = s.challenges && s.challenges.length > 1;
-    btn.textContent = (sessionCode && course.refereeCode)
-      ? (multi ? '✓ Alles klaar — laat beoordelen' : '✓ Klaar — laat beoordelen')
-      : (multi ? '✓ Alle challenges klaar!' : '✓ Challenge klaar!');
+    btn.textContent = multi ? '✓ Alle challenges klaar!' : '✓ Challenge klaar!';
     btn.style.display = 'block';
     toast('🔓 Clue vrijgegeven bij ' + s.name + '!');
   }, 400);
@@ -1903,15 +1918,26 @@ function markChallengeDone() {
     }
   }
   document.getElementById('btn-challenge-done').style.display = 'none';
-  if (sessionCode && course.refereeCode) {
-    // referee flow: set pending, show spinner, listen for approval
-    document.getElementById('pending-overlay').classList.add('show');
-    pushChallengeState('pending');
-    listenForRefereeApproval();
-  } else {
-    // no referee: award every challenge's letter, then go to score
-    revealAllLetters(chs, function() { showScoreArea(); });
-  }
+  // Route through referee approval only if a referee is actually watching this group
+  // (independent of whether a referee code is set). Otherwise self-report.
+  refereeIsPresent(function(present) {
+    if (present) {
+      document.getElementById('pending-overlay').classList.add('show');
+      pushChallengeState('pending');
+      listenForRefereeApproval();
+    } else {
+      revealAllLetters(chs, function() { showScoreArea(); });
+    }
+  });
+}
+
+// Check whether a referee is currently watching this player's group.
+function refereeIsPresent(cb) {
+  if (!sessionCode) { cb(false); return; }
+  var db = getFirebase(); if (!db) { cb(false); return; }
+  db.ref('sessions/' + sessionCode + '/refPresence/' + group).once('value')
+    .then(function(snap) { cb(!!snap.val()); })
+    .catch(function() { cb(false); });
 }
 
 // Reveal each challenge's letter in sequence (skips challenges without a letter).
@@ -2079,6 +2105,7 @@ function leaveSession() {
 
 function exitRefereeView() {
   if (refereeStateRef) { refereeStateRef.off(); refereeStateRef = null; }
+  if (refPresenceRef) { refPresenceRef.onDisconnect().cancel(); refPresenceRef.remove(); refPresenceRef = null; }
   isReferee = false;
   goToSessionMenu();
 }
