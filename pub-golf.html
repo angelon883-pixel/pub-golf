@@ -2633,25 +2633,34 @@ function toggleBonusFields(suffix) {
 }
 
 function readEditor(g) {
+  // Element ids are duplicated across the mobile and desktop editor copies, so read
+  // from the visible container to capture the values the user actually edited.
+  var gl = g.toLowerCase();
+  var container = [document.getElementById('editor-'+gl+'-desktop'), document.getElementById('editor-'+gl+'-mobile')]
+    .find(function(el) { return el && el.offsetParent !== null; })
+    || document.getElementById('editor-'+gl+'-mobile');
+  function q(id) { return container ? container.querySelector('[id="' + id + '"]') : document.getElementById(id); }
+
   var result = [];
   for (var i = 0; i < course[g].length; i++) {
     var chs = course[g][i].challenges || [{}];
     var challenges = chs.map(function(_, ci) {
+      var pre = 'f-'+g+'-'+i+'-'+ci+'-';
       return {
-        clueTitle:    (document.getElementById('f-'+g+'-'+i+'-'+ci+'-clueTitle') || {}).value || '',
-        challenge:    (document.getElementById('f-'+g+'-'+i+'-'+ci+'-challenge') || {}).value || '',
-        letter:       ((document.getElementById('f-'+g+'-'+i+'-'+ci+'-letter') || {}).value || '').toUpperCase().trim(),
-        letterGifUrl: (document.getElementById('f-'+g+'-'+i+'-'+ci+'-gifUrl') || {}).value || '',
-        par:          parseInt((document.getElementById('f-'+g+'-'+i+'-'+ci+'-par') || {}).value) || 2,
-        photo:        !!(document.getElementById('f-'+g+'-'+i+'-'+ci+'-photo') || {}).checked,
-        wildcard:     !!(document.getElementById('f-'+g+'-'+i+'-'+ci+'-wildcard') || {}).checked
+        clueTitle:    (q(pre+'clueTitle') || {}).value || '',
+        challenge:    (q(pre+'challenge') || {}).value || '',
+        letter:       ((q(pre+'letter') || {}).value || '').toUpperCase().trim(),
+        letterGifUrl: (q(pre+'gifUrl') || {}).value || '',
+        par:          2,
+        photo:        !!(q(pre+'photo') || {}).checked,
+        wildcard:     !!(q(pre+'wildcard') || {}).checked
       };
     });
     result.push({
-      name:    document.getElementById('f-'+g+'-'+i+'-name').value,
-      address: document.getElementById('f-'+g+'-'+i+'-address').value,
-      lat:     parseFloat(document.getElementById('f-'+g+'-'+i+'-lat').value) || 0,
-      lng:     parseFloat(document.getElementById('f-'+g+'-'+i+'-lng').value) || 0,
+      name:    (q('f-'+g+'-'+i+'-name') || {}).value || '',
+      address: (q('f-'+g+'-'+i+'-address') || {}).value || '',
+      lat:     parseFloat((q('f-'+g+'-'+i+'-lat') || {}).value) || 0,
+      lng:     parseFloat((q('f-'+g+'-'+i+'-lng') || {}).value) || 0,
       challenges: challenges
     });
   }
