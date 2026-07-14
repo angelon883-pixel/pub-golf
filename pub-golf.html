@@ -1994,13 +1994,13 @@ function showLetterReveal(letter, gifUrl, cb, skipPush) {
   prog.style.transition = 'none';
   prog.style.width = '100%';
   setTimeout(function() {
-    prog.style.transition = 'width 10s linear';
+    prog.style.transition = 'width 4s linear';
     prog.style.width = '0%';
   }, 50);
   setTimeout(function() {
     el.classList.remove('show');
     if (cb) cb();
-  }, 10000);
+  }, 4000);
 }
 
 function showScoreArea() {
