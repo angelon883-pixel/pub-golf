@@ -836,7 +836,7 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
   <div id="puzzle-intro-overlay" style="position:absolute;inset:0;background:var(--dark);z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;text-align:center;">
     <div style="font-family:'Bebas Neue',sans-serif;font-size:36px;color:var(--gold);margin-bottom:16px;">🔤 Eindspel!</div>
     <div id="puzzle-intro-text" style="font-size:15px;color:var(--text);line-height:1.6;margin-bottom:32px;max-width:320px;"></div>
-    <button class="btn-primary" onclick="startPuzzleGame()" style="font-size:20px;padding:16px 40px;">▶ Start!</button>
+    <button class="btn-primary" onclick="startPuzzleGame()" style="display:inline-block;width:auto;font-size:20px;padding:16px 40px;">▶ Start!</button>
   </div>
   <div class="puzzle-header">
     <div class="puzzle-title">🔤 Maak de zin!</div>
@@ -1753,25 +1753,32 @@ function triggerArrivalAlarm() {
   // Vibrate: 3 short bursts
   if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 400]);
 
-  // Sound: play a short fanfare using Web Audio API
+  // Sound: old-fashioned bell (a couple of strikes) via Web Audio API
   try {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     var ctx = audioCtx;
-    var notes = [523, 659, 784, 1047]; // C5 E5 G5 C6
-    notes.forEach(function(freq, i) {
-      var osc = ctx.createOscillator();
-      var gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.frequency.value = freq;
-      osc.type = 'sine';
-      var t = ctx.currentTime + i * 0.12;
-      gain.gain.setValueAtTime(0, t);
-      gain.gain.linearRampToValueAtTime(0.4, t + 0.02);
-      gain.gain.linearRampToValueAtTime(0, t + 0.18);
-      osc.start(t);
-      osc.stop(t + 0.2);
-    });
+    // Inharmonic partials give a metallic bell timbre; each decays exponentially.
+    var partials = [
+      { r: 1.0, a: 1.0 }, { r: 2.0, a: 0.6 }, { r: 2.4, a: 0.5 },
+      { r: 3.0, a: 0.35 }, { r: 4.5, a: 0.25 }, { r: 5.4, a: 0.18 }
+    ];
+    function ringBell(t, fundamental, vol, dur) {
+      partials.forEach(function(p) {
+        var osc = ctx.createOscillator();
+        var gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = fundamental * p.r;
+        osc.connect(gain); gain.connect(ctx.destination);
+        gain.gain.setValueAtTime(0.0001, t);
+        gain.gain.exponentialRampToValueAtTime(vol * p.a, t + 0.004);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        osc.start(t);
+        osc.stop(t + dur + 0.05);
+      });
+    }
+    var now = ctx.currentTime;
+    ringBell(now,        660, 0.5, 1.4);  // ding
+    ringBell(now + 0.42, 660, 0.4, 1.4);  // dong
   } catch(e) {}
 
   // Screen flash
