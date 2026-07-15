@@ -949,6 +949,7 @@ var course = migrateCourse(JSON.parse(localStorage.getItem('pg_course') || 'null
 var group = 'A';
 var stopIdx = 0;
 var challengeIdx = 0;
+var doneChallenges = {};   // key stopIdx+'-'+challengeIdx -> true (per-challenge completion)
 var earnedLetters = [];
 var scores = [];
 var photos = {};
@@ -985,6 +986,7 @@ function chooseGroup(g) {
   group = g;
   stopIdx = 0;
   challengeIdx = 0;
+  doneChallenges = {};
   earnedLetters = [];
   scores = [];
   photos = {};
@@ -1447,11 +1449,38 @@ function fetchCourse(cb) {
   db.ref('courses/' + sessionCode).once('value').then(function(snap) {
     var data = snap.val();
     if (data) {
-      course = migrateCourse(data);
+      var incoming = migrateCourse(data);
+      // Uploaded (data:) GIFs are stripped before Firebase, so re-apply the ones we
+      // have locally where the incoming course has none (keeps uploads working on
+      // the device that made them).
+      preserveLocalGifs(course, incoming);
+      course = incoming;
       localStorage.setItem('pg_course', JSON.stringify(course));
       cb(true);
     } else { cb(false); }
   }).catch(function() { cb(false); });
+}
+
+// Copy locally-uploaded (data:) letter GIFs from `oldC` into `newC` where newC lacks one.
+function preserveLocalGifs(oldC, newC) {
+  if (!oldC || !newC) return;
+  ['A', 'B'].forEach(function(g) {
+    (newC[g] || []).forEach(function(s, si) {
+      var oldStop = (oldC[g] || [])[si];
+      if (!oldStop) return;
+      (s.challenges || []).forEach(function(ch, ci) {
+        var oldCh = (oldStop.challenges || [])[ci];
+        if (oldCh && (!ch.letterGifUrl || !ch.letterGifUrl.trim()) &&
+            oldCh.letterGifUrl && oldCh.letterGifUrl.indexOf('data:') === 0) {
+          ch.letterGifUrl = oldCh.letterGifUrl;
+        }
+      });
+    });
+  });
+  if (newC.puzzle && oldC.puzzle && (!newC.puzzle.completionGifUrl || !newC.puzzle.completionGifUrl.trim()) &&
+      oldC.puzzle.completionGifUrl && oldC.puzzle.completionGifUrl.indexOf('data:') === 0) {
+    newC.puzzle.completionGifUrl = oldC.puzzle.completionGifUrl;
+  }
 }
 
 function loadCourseForSession(done) {
@@ -1550,10 +1579,12 @@ function stopSync() {
 }
 
 // ── REFEREE FIREBASE STATE ─────────────────────
-function pushChallengeState(status) {
+// phase: 'arrival' (team says they're at the stop) or 'challenge' (a single challenge is done)
+function pushRefState(phase, status) {
   if (!sessionCode) return;
   var db = getFirebase(); if (!db) return;
   db.ref('sessions/' + sessionCode + '/state/' + group).set({
+    phase: phase,
     stopIdx: stopIdx,
     challengeIdx: challengeIdx,
     status: status,
@@ -1563,17 +1594,39 @@ function pushChallengeState(status) {
   });
 }
 
-function listenForRefereeApproval() {
+// Player waits for the referee to approve arrival, then unlocks the clue.
+function listenForArrivalApproval(s) {
   if (!sessionCode) return;
   var db = getFirebase(); if (!db) return;
   var ref = db.ref('sessions/' + sessionCode + '/state/' + group);
   ref.on('value', function(snap) {
     var d = snap.val();
-    if (!d) return;
+    if (!d || d.phase !== 'arrival') return;
     if (d.status === 'approved') {
-      document.getElementById('pending-overlay').classList.remove('show');
       ref.off();
-      // earnedLetters already includes the awarded letters (set by the referee)
+      document.getElementById('pending-overlay').classList.remove('show');
+      arrived = true;
+      unlockClue(s);
+      checkProximityWildcards();
+    } else if (d.status === 'rejected') {
+      ref.off();
+      document.getElementById('pending-overlay').classList.remove('show');
+      toast('❌ Scheidsrechter: nog niet ter plaatse');
+    }
+  });
+}
+
+// Player waits for the referee to approve the current challenge, then gets its letter(s).
+function listenForChallengeApproval() {
+  if (!sessionCode) return;
+  var db = getFirebase(); if (!db) return;
+  var ref = db.ref('sessions/' + sessionCode + '/state/' + group);
+  ref.on('value', function(snap) {
+    var d = snap.val();
+    if (!d || d.phase !== 'challenge') return;
+    if (d.status === 'approved') {
+      ref.off();
+      document.getElementById('pending-overlay').classList.remove('show');
       earnedLetters = d.earnedLetters || earnedLetters;
       var letters = d.awardedLetters || [];
       var gifs = d.awardedGifs || [];
@@ -1583,16 +1636,31 @@ function listenForRefereeApproval() {
           var L = letters[i], G = gifs[i] || ''; i++;
           showLetterReveal(L, G, revealNext, true);
         } else {
-          finishStop();
+          onChallengeApproved();
         }
       })();
     } else if (d.status === 'rejected') {
-      document.getElementById('pending-overlay').classList.remove('show');
       ref.off();
+      document.getElementById('pending-overlay').classList.remove('show');
       toast('❌ Afgekeurd — probeer opnieuw');
       document.getElementById('btn-challenge-done').style.display = 'block';
     }
   });
+}
+
+// After a challenge is approved (referee or self-report): mark it done and move to the
+// next unfinished challenge, or finish the stop when all challenges are done.
+function onChallengeApproved() {
+  doneChallenges[stopIdx + '-' + challengeIdx] = true;
+  var chs = (getStops()[stopIdx] || {}).challenges || [];
+  var next = -1;
+  for (var i = 0; i < chs.length; i++) {
+    if (!doneChallenges[stopIdx + '-' + i]) { next = i; break; }
+  }
+  if (next === -1) { finishStop(); return; }
+  challengeIdx = next;
+  renderChallengeView();
+  document.getElementById('btn-challenge-done').style.display = 'block';
 }
 
 // ── REFEREE MODE ───────────────────────────────
@@ -1649,34 +1717,29 @@ function listenRefereeState() {
 function renderRefereeView(d) {
   var stops = course[refereeGroup] || [];
   var si = d ? d.stopIdx : 0;
-  var ci = d ? d.challengeIdx : 0;
+  var ci = d ? (d.challengeIdx || 0) : 0;
   var status = d ? d.status : 'waiting';
+  var phase = d ? d.phase : null;
   var stop = stops[si];
   var chs = (stop && stop.challenges) ? stop.challenges : [];
-  var multi = chs.length > 1;
 
   document.getElementById('ref-hole-label').textContent = 'HOLE ' + (si+1) + ' / ' + stops.length;
   document.getElementById('ref-stop-name').textContent = stop ? stop.name : '—';
-  document.getElementById('ref-challenge-num').textContent =
-    multi ? chs.length + ' challenges — beoordeel samen' : '';
 
-  // Letters this stop would award (from challenge letters or the answer word)
-  var pairs = stop ? lettersForStop(stop, (d && d.earnedLetters || []).length) : [];
+  // Letter(s) the current challenge would award
+  var pairs = stop ? lettersForChallenge(stop, ci, (d && d.earnedLetters || []).length) : [];
 
-  // Show all challenges of the stop, each with the letter it would award
-  if (multi) {
-    document.getElementById('ref-clue-title').textContent = '';
-    document.getElementById('ref-clue-body').innerHTML = chs.map(function(c, i) {
-      var L = pairs[i] ? pairs[i].letter : '';
-      return '<div style="margin-bottom:10px;"><strong style="color:var(--secondary);">' + (i+1) + '. ' + safeVal(c.clueTitle || '') +
-        (L ? ' <span style="color:var(--gold);">[' + L + ']</span>' : '') +
-        (c.photo ? ' 📸' : '') + '</strong><br>' + safeVal(c.challenge || '') + '</div>';
-    }).join('');
+  if (phase === 'arrival') {
+    document.getElementById('ref-challenge-num').textContent = 'Aankomst';
+    document.getElementById('ref-clue-title').textContent = '📍 Team zegt: wij zijn er';
+    document.getElementById('ref-clue-body').textContent = 'Bevestig dat het team bij ' + (stop ? stop.name : 'de stop') + ' is voordat de challenge vrijkomt.';
   } else {
-    var ch0 = chs[0] || null;
-    var L0 = pairs[0] ? pairs[0].letter : '';
-    document.getElementById('ref-clue-title').textContent = (ch0 ? ch0.clueTitle : '—') + (L0 ? '  [' + L0 + ']' : '');
-    document.getElementById('ref-clue-body').textContent = ch0 ? ch0.challenge : '—';
+    document.getElementById('ref-challenge-num').textContent =
+      chs.length > 1 ? 'Challenge ' + (ci+1) + ' / ' + chs.length : '';
+    var ch = chs[ci] || null;
+    var L0 = pairs.map(function(p){return p.letter;}).join('');
+    document.getElementById('ref-clue-title').textContent = (ch ? ch.clueTitle : '—') + (L0 ? '  [' + L0 + ']' : '');
+    document.getElementById('ref-clue-body').textContent = ch ? ch.challenge : '—';
   }
 
   // earned letters strip
@@ -1692,23 +1755,27 @@ function renderRefereeView(d) {
 
   if (status === 'pending') {
     statusEl.className = 'referee-status pending';
-    statusEl.textContent = '⚡ Team klaar! Beoordeel nu';
     panel.style.display = 'block';
-    // one chip per challenge that awards a letter — pre-selected, tap to deselect
     row.innerHTML = '';
-    pairs.forEach(function(p, i) {
-      if (!p.letter) return;
-      var chip = document.createElement('div');
-      chip.className = 'letter-award-chip sel';
-      chip.textContent = p.letter;
-      chip.dataset.letter = p.letter;
-      chip.dataset.gif = p.gif || '';
-      chip.title = 'Challenge ' + (i+1);
-      chip.onclick = function() { chip.classList.toggle('sel'); };
-      row.appendChild(chip);
-    });
-    if (!row.children.length) {
-      row.innerHTML = '<div style="font-size:12px;color:var(--muted);">Geen letters ingesteld — voeg een antwoordwoord toe in de editor (Eindspel).</div>';
+    if (phase === 'arrival') {
+      statusEl.textContent = '📍 Team is aangekomen — bevestig';
+      row.innerHTML = '<div style="font-size:12px;color:var(--muted);">Goedkeuren = challenge vrijgeven.</div>';
+    } else {
+      statusEl.textContent = '⚡ Challenge klaar! Beoordeel nu';
+      // chips for the letter(s) this challenge awards — pre-selected, tap to deselect
+      pairs.forEach(function(p) {
+        if (!p.letter) return;
+        var chip = document.createElement('div');
+        chip.className = 'letter-award-chip sel';
+        chip.textContent = p.letter;
+        chip.dataset.letter = p.letter;
+        chip.dataset.gif = p.gif || '';
+        chip.onclick = function() { chip.classList.toggle('sel'); };
+        row.appendChild(chip);
+      });
+      if (!row.children.length) {
+        row.innerHTML = '<div style="font-size:12px;color:var(--muted);">Geen letter ingesteld — voeg een letter of antwoordwoord toe in de editor.</div>';
+      }
     }
   } else {
     statusEl.className = 'referee-status waiting';
@@ -1794,9 +1861,18 @@ function manualUnlock() {
   if (arrived) return;
   var s = getStops()[stopIdx];
   if (!s) return;
-  arrived = true;
-  unlockClue(s);
-  checkProximityWildcards();
+  // If a referee is watching, arrival must be approved before the clue unlocks.
+  refereeIsPresent(function(present) {
+    if (present) {
+      document.getElementById('pending-overlay').classList.add('show');
+      pushRefState('arrival', 'pending');
+      listenForArrivalApproval(s);
+    } else {
+      arrived = true;
+      unlockClue(s);
+      checkProximityWildcards();
+    }
+  });
 }
 
 function unlockClue(s) {
@@ -1813,11 +1889,6 @@ function unlockClue(s) {
     void open.offsetWidth;
     open.classList.add('animate');
     renderChallengeView();
-    // One submit button for the whole stop
-    var btn = document.getElementById('btn-challenge-done');
-    var multi = s.challenges && s.challenges.length > 1;
-    btn.textContent = multi ? '✓ Alle challenges klaar!' : '✓ Challenge klaar!';
-    btn.style.display = 'block';
     toast('🔓 Clue vrijgegeven bij ' + s.name + '!');
   }, 400);
 }
@@ -1844,15 +1915,17 @@ function renderChallengeView() {
     document.getElementById('challenge-next').disabled = (challengeIdx === chs.length - 1);
     dots.innerHTML = chs.map(function(c, i) {
       var cls = 'challenge-dot' + (i === challengeIdx ? ' active' : '');
-      if (c.photo && photos[stopIdx + '-' + i]) cls += ' done';
+      if (doneChallenges[stopIdx + '-' + i]) cls += ' done';
       return '<div class="' + cls + '"></div>';
     }).join('');
   }
 
-  // photo section for this challenge
+  var isDone = !!doneChallenges[stopIdx + '-' + challengeIdx];
+
+  // photo section for this challenge (hidden once done)
   var photoSec = document.getElementById('photo-section');
   var preview = document.getElementById('photo-preview');
-  if (ch && ch.photo) {
+  if (ch && ch.photo && !isDone) {
     photoSec.classList.add('visible');
     var photoKey = stopIdx + '-' + challengeIdx;
     if (photos[photoKey]) {
@@ -1866,6 +1939,15 @@ function renderChallengeView() {
   } else {
     photoSec.classList.remove('visible');
     preview.classList.remove('has-photo');
+  }
+
+  // submit button: shown only for the current, not-yet-done challenge
+  var btn = document.getElementById('btn-challenge-done');
+  if (isDone) {
+    btn.style.display = 'none';
+  } else {
+    btn.textContent = multi ? ('✓ Challenge ' + (challengeIdx+1) + ' klaar!') : '✓ Challenge klaar!';
+    btn.style.display = 'block';
   }
 }
 
@@ -1944,31 +2026,27 @@ function downloadStripPhoto(key) {
 }
 
 // ── SCORING ───────────────────────────────────
-// Submit the whole stop (all challenges) at once for judging.
+// Submit the CURRENT challenge (challengeIdx) for judging — one at a time.
 function markChallengeDone() {
   var s = getStops()[stopIdx];
-  var chs = s.challenges || [];
-  // validate that every photo-required challenge has a photo
-  for (var i = 0; i < chs.length; i++) {
-    if (chs[i].photo && !photos[stopIdx + '-' + i]) {
-      toast('📸 Foto ontbreekt bij challenge ' + (i + 1));
-      goToChallenge(i);
-      document.getElementById('photo-required-note').style.display = 'block';
-      return;
-    }
+  var ch = (s.challenges || [])[challengeIdx];
+  // validate photo for this challenge only
+  if (ch && ch.photo && !photos[stopIdx + '-' + challengeIdx]) {
+    toast('📸 Maak eerst een groepsfoto!');
+    document.getElementById('photo-required-note').style.display = 'block';
+    return;
   }
   document.getElementById('btn-challenge-done').style.display = 'none';
-  // Route through referee approval only if a referee is actually watching this group
-  // (independent of whether a referee code is set). Otherwise self-report.
+  // Route through referee approval only if a referee is actually watching this group.
   refereeIsPresent(function(present) {
     if (present) {
       document.getElementById('pending-overlay').classList.add('show');
-      pushChallengeState('pending');
-      listenForRefereeApproval();
+      pushRefState('challenge', 'pending');
+      listenForChallengeApproval();
     } else {
-      // no referee watching: award this stop's letters directly
-      var pairs = lettersForStop(s, earnedLetters.length);
-      revealPairs(pairs, function() { finishStop(); });
+      // no referee watching: award this challenge's letter(s) directly
+      var pairs = lettersForChallenge(s, challengeIdx, earnedLetters.length);
+      revealPairs(pairs, function() { onChallengeApproved(); });
     }
   });
 }
@@ -1982,18 +2060,18 @@ function refereeIsPresent(cb) {
     .catch(function() { cb(false); });
 }
 
-// Which letters a stop awards, aligned to its challenges.
-// A challenge's own letter takes priority; otherwise the next unused letter of
-// the puzzle answer is used (so you only need to set the answer word).
-// Returns array of { letter, gif } (letter may be '' if none available).
-function lettersForStop(stop, earnedCount) {
+// Which letter(s) a single challenge awards. Returns array of { letter, gif }.
+// A challenge's own letter field takes priority (may hold multiple letters);
+// otherwise the next unused letter of the puzzle answer is used.
+function lettersForChallenge(stop, ci, earnedCount) {
+  var c = (stop.challenges || [])[ci];
+  if (c && c.letter) {
+    var chars = c.letter.toUpperCase().replace(/[^A-Z]/g, '').split('');
+    return chars.map(function(L) { return { letter: L, gif: c.letterGifUrl || '' }; });
+  }
   var ans = ((course.puzzle || {}).answer || '').toUpperCase().replace(/[^A-Z]/g, '');
-  var derived = earnedCount;
-  return (stop.challenges || []).map(function(c) {
-    if (c && c.letter) return { letter: c.letter, gif: c.letterGifUrl || '' };
-    if (ans && derived < ans.length) { var L = ans[derived]; derived++; return { letter: L, gif: (c && c.letterGifUrl) || '' }; }
-    return { letter: '', gif: '' };
-  });
+  if (ans && earnedCount < ans.length) return [{ letter: ans[earnedCount], gif: (c && c.letterGifUrl) || '' }];
+  return [];
 }
 
 // Reveal a list of {letter, gif} pairs in sequence (skips empty).
@@ -2481,7 +2559,7 @@ function renderEditor(g) {
           '</div>' +
           '<div class="stop-fields-grid">' +
             '<div class="field"><label>Titel</label><input type="text" id="f-'+g+'-'+i+'-'+ci+'-clueTitle" value="'+safeVal(ch.clueTitle)+'"></div>' +
-            '<div class="field"><label>Letter</label><input type="text" id="f-'+g+'-'+i+'-'+ci+'-letter" maxlength="1" value="'+safeVal(ch.letter)+'" style="text-transform:uppercase;"></div>' +
+            '<div class="field"><label>Letter(s)</label><input type="text" id="f-'+g+'-'+i+'-'+ci+'-letter" maxlength="8" value="'+safeVal(ch.letter)+'" placeholder="bv. P of PU" style="text-transform:uppercase;"></div>' +
             '<div class="field full"><label>Challenge omschrijving</label><textarea id="f-'+g+'-'+i+'-'+ci+'-challenge">'+safeText(ch.challenge)+'</textarea></div>' +
             '<div class="field full"><label>Letter GIF</label><div style="display:flex;gap:6px;">' +
               '<input type="text" id="f-'+g+'-'+i+'-'+ci+'-gifUrl" value="'+safeVal(ch.letterGifUrl)+'" placeholder="https://...gif" style="flex:1;">' +
