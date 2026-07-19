@@ -2467,16 +2467,13 @@ function howtoStep(dir) {
   howtoIdx += dir;
   if (howtoIdx >= HOWTO_STEPS.length) {
     document.getElementById('howto-overlay').classList.remove('show');
-    localStorage.setItem('pg_seen_intro', '1');
     return;
   }
   if (howtoIdx < 0) howtoIdx = 0;
   renderHowto();
 }
-// Auto-show on first ever launch
-if (!localStorage.getItem('pg_seen_intro')) {
-  setTimeout(openHowTo, 600);
-}
+// Always show the how-to when the app opens
+setTimeout(openHowTo, 600);
 
 // ── PUZZLE ────────────────────────────────────
 var puzzleAnswer = [];
