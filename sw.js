@@ -1,4 +1,4 @@
-const CACHE = 'pubgolf-v3';
+const CACHE = 'pubgolf-v4';
 const ASSETS = [
   './manifest.json',
   'https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&display=swap',
