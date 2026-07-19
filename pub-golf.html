@@ -950,7 +950,8 @@ var DEFAULTS = {
   ],
   bonus: {
     enabled: true,
-    triggerAfterHole: 4,
+    triggerAfterHoleA: 4,
+    triggerAfterHoleB: 4,
     name: "The Secret Vault",
     address: "Amstelstraat 24",
     lat: 52.3671,
@@ -1465,7 +1466,7 @@ function blankCourse() {
     A: [ makeStop('Nieuwe Stop', 'Adres invoeren', 52.3702, 4.8952, [makeChallenge('Nieuwe Challenge', 'Omschrijf de challenge hier.', 2, false, false, '', '')]) ],
     B: [ makeStop('Nieuwe Stop', 'Adres invoeren', 52.3702, 4.8952, [makeChallenge('Nieuwe Challenge', 'Omschrijf de challenge hier.', 2, false, false, '', '')]) ],
     nameA: 'Team A', nameB: 'Team B', refereeCode: '', wildcards: [],
-    bonus: { enabled: false, triggerAfterHole: 4, name: '', address: '', lat: 52.3702, lng: 4.8952, par: 2, challenge: '' },
+    bonus: { enabled: false, triggerAfterHoleA: 4, triggerAfterHoleB: 4, name: '', address: '', lat: 52.3702, lng: 4.8952, par: 2, challenge: '' },
     puzzle: { introText: '', answer: '', completionGifUrl: '' }
   };
 }
@@ -2196,7 +2197,7 @@ function finishStop() {
   pushScore();
   pushGameState();
   var bonus = course.bonus;
-  if (bonus && bonus.enabled && !bonusInserted && stopIdx === bonus.triggerAfterHole) {
+  if (bonus && bonus.enabled && !bonusInserted && stopIdx === bonusTriggerHole()) {
     bonusPending = true;
     document.getElementById('bonus-hole-name').textContent = bonus.name;
     document.getElementById('bonus-hole-addr').textContent = bonus.address;
@@ -2264,9 +2265,9 @@ function confirmScore() {
   stopIdx++;
   pushGameState();
 
-  // check bonus hole trigger
+  // check bonus hole trigger (per team)
   var bonus = course.bonus;
-  if (bonus && bonus.enabled && !bonusInserted && stopIdx === bonus.triggerAfterHole) {
+  if (bonus && bonus.enabled && !bonusInserted && stopIdx === bonusTriggerHole()) {
     bonusPending = true;
     // show bonus interstitial
     document.getElementById('bonus-hole-name').textContent = bonus.name;
@@ -2277,6 +2278,13 @@ function confirmScore() {
   }
 
   advanceStop();
+}
+
+// Hole after which the bonus appears, per team (falls back to the shared value).
+function bonusTriggerHole() {
+  var b = course.bonus || {};
+  var v = group === 'A' ? b.triggerAfterHoleA : b.triggerAfterHoleB;
+  return v || b.triggerAfterHole || 4;
 }
 
 function acceptBonus() {
@@ -2920,7 +2928,10 @@ function renderBonusEditor(suffix) {
       '<span class="toggle-track"></span></label>' +
     '</div>' +
     '<div class="bonus-fields'+(enabled?' visible':'')+'" id="bonus-fields-'+suffix+'">' +
-      '<div class="field"><label>Na hole #</label><input type="number" min="1" max="20" id="bonus-trigger-'+suffix+'" value="'+(b.triggerAfterHole||4)+'"></div>' +
+      '<div class="field coords-pair">' +
+        '<div><label style="color:var(--primary);">🔥 Team A na hole #</label><input type="number" min="1" max="20" id="bonus-trigA-'+suffix+'" value="'+(b.triggerAfterHoleA||b.triggerAfterHole||4)+'"></div>' +
+        '<div><label style="color:var(--secondary);">💀 Team B na hole #</label><input type="number" min="1" max="20" id="bonus-trigB-'+suffix+'" value="'+(b.triggerAfterHoleB||b.triggerAfterHole||4)+'"></div>' +
+      '</div>' +
       '<div class="field"><label>Naam</label><input type="text" id="bonus-name-'+suffix+'" value="'+safeVal(b.name||'')+'"></div>' +
       '<div class="field"><label>Adres</label><div class="addr-wrap" style="position:relative;"><div style="display:flex; gap:8px;">' +
         '<input type="text" id="bonus-addr-'+suffix+'" value="'+safeVal(b.address||'')+'" style="flex:1;" autocomplete="off" oninput="addrInputBonus(this,\''+suffix+'\')" onblur="addrBlurBonus(\''+suffix+'\')">' +
@@ -2989,9 +3000,10 @@ function readWildcards(suffix) {
 function readBonus(suffix) {
   var get = function(id) { var el = document.getElementById(id); return el ? el.value : ''; };
   return {
-    enabled:          !!(document.getElementById('bonus-enabled-'+suffix) && document.getElementById('bonus-enabled-'+suffix).checked),
-    triggerAfterHole: parseInt(get('bonus-trigger-'+suffix))||4,
-    name:             get('bonus-name-'+suffix),
+    enabled:           !!(document.getElementById('bonus-enabled-'+suffix) && document.getElementById('bonus-enabled-'+suffix).checked),
+    triggerAfterHoleA: parseInt(get('bonus-trigA-'+suffix))||4,
+    triggerAfterHoleB: parseInt(get('bonus-trigB-'+suffix))||4,
+    name:              get('bonus-name-'+suffix),
     address:          get('bonus-addr-'+suffix),
     lat:              parseFloat(get('bonus-lat-'+suffix))||52.3702,
     lng:              parseFloat(get('bonus-lng-'+suffix))||4.8952,
