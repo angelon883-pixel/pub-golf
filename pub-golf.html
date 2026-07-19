@@ -83,6 +83,10 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
 .header-group.b { color: var(--secondary); }
 .score-badge { font-size: 12px; color: var(--muted); }
 .score-badge span { color: var(--text); font-size: 15px; }
+.progress-wrap { padding: 10px 20px 0; background: var(--dark); }
+.progress-label { font-family: 'Bebas Neue', sans-serif; font-size: 14px; letter-spacing: 1px; color: var(--muted); margin-bottom: 5px; }
+.progress-track { height: 7px; background: var(--card); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+.progress-fill { height: 100%; width: 0%; background: var(--primary); border-radius: 4px; transition: width 0.4s ease; }
 .gps-pill { display: flex; align-items: center; gap: 6px; background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 5px 10px; font-size: 11px; color: var(--muted); }
 .gps-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
 .gps-dot.active { background: var(--primary); animation: gpsPulse 1.5s infinite; }
@@ -392,7 +396,8 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
 .puzzle-letter:active { transform: scale(1.1); border-color: var(--gold); }
 .puzzle-letter.dragging { opacity: 0.4; }
 .puzzle-letter.placed { display: none; }
-.puzzle-slots { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 20px; }
+.puzzle-slots { display: flex; flex-wrap: wrap; gap: 10px 22px; justify-content: center; margin-bottom: 20px; }
+.puzzle-word { display: flex; gap: 8px; }
 .puzzle-slot { width: 52px; height: 52px; border-radius: 10px; border: 2px dashed var(--border); display: flex; align-items: center; justify-content: center; font-family: 'Bebas Neue', sans-serif; font-size: 32px; color: transparent; transition: border-color 0.2s, background 0.2s; }
 .puzzle-slot.has-letter { border-color: var(--gold); color: var(--gold); background: #1a1000; }
 .puzzle-slot.correct { border-color: var(--green); color: var(--green); background: #001a08; }
@@ -602,7 +607,19 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
 <div class="screen active" id="screen-intro">
   <div class="logo">PUB<br><span>GOLF</span></div>
   <div class="tagline">May the best group win</div>
-  <button class="group-btn group-a" style="margin-bottom:32px; width:100%; max-width:200px;" onclick="show('screen-session'); renderSavedSessions();"><span class="emoji">▶</span>START</button>
+  <button class="group-btn group-a" style="margin-bottom:16px; width:100%; max-width:200px;" onclick="show('screen-session'); renderSavedSessions();"><span class="emoji">▶</span>START</button>
+  <button onclick="openHowTo()" style="background:none; border:none; color:var(--muted); font-family:'DM Mono',monospace; font-size:13px; cursor:pointer; letter-spacing:1px;">❔ Hoe werkt het?</button>
+</div>
+
+<!-- HOW-TO / ONBOARDING -->
+<div class="modal-overlay" id="howto-overlay">
+  <div class="modal-box" style="max-width:420px; text-align:left;">
+    <div id="howto-body"></div>
+    <div class="modal-actions" style="margin-top:16px;">
+      <button class="btn-back" id="howto-prev" onclick="howtoStep(-1)">← Vorige</button>
+      <button class="btn-session-join" id="howto-next" onclick="howtoStep(1)">Volgende →</button>
+    </div>
+  </div>
 </div>
 
 <!-- EDIT -->
@@ -640,6 +657,7 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
         <div id="puzzle-editor-mobile"></div>
       </div>
       <button class="btn-save" onclick="saveRoute()">✓ Opslaan</button>
+      <button class="btn-back" onclick="previewRoute()">👁️ Preview route (zonder GPS)</button>
       <button class="btn-back" onclick="closeEditor()">← Terug zonder opslaan</button>
     </div>
 
@@ -666,6 +684,7 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
       </div>
       <div class="desktop-actions">
         <button class="btn-save" onclick="saveRoute()">✓ Opslaan</button>
+        <button class="btn-back" onclick="previewRoute()">👁️ Preview route (zonder GPS)</button>
         <button class="btn-back" onclick="closeEditor()">← Terug zonder opslaan</button>
       </div>
     </div>
@@ -679,13 +698,20 @@ body { background: var(--dark); color: var(--text); font-family: 'DM Mono', mono
       <button onclick="leaveGame()" style="background:none; border:none; color:var(--muted); font-size:20px; cursor:pointer; padding:0; line-height:1;" title="Verlaat spel">✕</button>
       <div>
         <div class="header-group a" id="hdr-group" onclick="renameTeam()" style="cursor:pointer;" title="Tik om teamnaam aan te passen">GROUP A ✎</div>
-        <div class="score-badge">Letters: <span id="hdr-score">0</span></div>
+        <div class="score-badge">Letters: <span id="hdr-score">0</span> · ⏱ <span id="hdr-timer">0:00</span></div>
       </div>
     </div>
     <div class="gps-pill" onclick="retryGPS()" style="cursor:pointer;" title="Tik om GPS opnieuw te proberen">
       <div class="gps-dot" id="gps-dot"></div>
       <span id="gps-txt">searching</span>
     </div>
+  </div>
+
+  <div id="preview-banner" style="display:none; background:var(--gold); color:#000; text-align:center; padding:6px; font-family:'DM Mono',monospace; font-size:12px; font-weight:500;">👁️ PREVIEW — GPS uit · tik "Ik ben er" om te openen</div>
+
+  <div class="progress-wrap">
+    <div class="progress-label" id="progress-label">Hole 1 / 8</div>
+    <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
   </div>
 
   <div class="live-score-bar" id="live-score-bar">
@@ -962,6 +988,7 @@ var bonusPending = false;
 var map = null, playerMarker = null, destMarker = null, routeLine = null;
 var lastPos = null;
 var isReferee = false;
+var previewMode = false;   // editor "preview route" — no GPS, no sync, no referee
 var refereeGroup = null;
 var canEditCourse = false;
 var refereeStateRef = null;
@@ -995,6 +1022,8 @@ function chooseGroup(g) {
   bonusInserted = false;
   bonusPending = false;
   isReferee = false;
+  playStartMs = 0;
+  stopPlayTimer();
   fetchCourse(function() { loadGameState(function(state) {
     if (state && state.stopIdx > 0) {
       openNameModal('Doorgaan bij hole ' + (state.stopIdx + 1) + '? (Ja = doorgaan)', function(ans) {
@@ -1003,6 +1032,7 @@ function chooseGroup(g) {
           challengeIdx = state.challengeIdx || 0;
           scores = state.scores || [];
           earnedLetters = state.earnedLetters || [];
+          if (state.playStartMs) { playStartMs = state.playStartMs; startPlayTimer(); }
         }
         startGame();
       });
@@ -1062,6 +1092,10 @@ function renderStop() {
   document.getElementById('stop-name').textContent = s.name;
   document.getElementById('stop-addr').textContent = s.address;
   document.getElementById('hdr-score').textContent = earnedLetters.length;
+
+  // progress bar
+  document.getElementById('progress-label').textContent = 'Hole ' + (stopIdx+1) + ' / ' + stops.length;
+  document.getElementById('progress-fill').style.width = Math.round((stopIdx / stops.length) * 100) + '%';
 
   // bonus badge
   var bb = document.getElementById('bonus-badge');
@@ -1303,8 +1337,9 @@ function startGame() {
   renderStop();
   renderScorecard();
   show('screen-game');
-  startGPS();
-  if (sessionCode) {
+  document.getElementById('preview-banner').style.display = previewMode ? 'block' : 'none';
+  if (!previewMode) startGPS();
+  if (sessionCode && !previewMode) {
     startSync();
     // Listen for referee-triggered session reset
     var db = getFirebase();
@@ -1443,6 +1478,20 @@ function toggleMapExpand() {
 
 // Fetch the latest course for the current session from Firebase.
 // cb(true) if a course was loaded, cb(false) otherwise.
+function offlineCache(cb) {
+  // Fall back to a locally cached copy of this session's route (offline play).
+  try {
+    var cached = localStorage.getItem('pg_course_' + sessionCode);
+    if (cached) {
+      course = migrateCourse(JSON.parse(cached));
+      localStorage.setItem('pg_course', JSON.stringify(course));
+      toast('📴 Offline — opgeslagen route geladen');
+      cb(true); return;
+    }
+  } catch(e) {}
+  cb(false);
+}
+
 function fetchCourse(cb) {
   var db = getFirebase();
   if (!db || !sessionCode) { cb(false); return; }
@@ -1456,9 +1505,10 @@ function fetchCourse(cb) {
       preserveLocalGifs(course, incoming);
       course = incoming;
       localStorage.setItem('pg_course', JSON.stringify(course));
+      localStorage.setItem('pg_course_' + sessionCode, JSON.stringify(course)); // offline cache
       cb(true);
-    } else { cb(false); }
-  }).catch(function() { cb(false); });
+    } else { offlineCache(cb); }   // no data online → try local cache
+  }).catch(function() { offlineCache(cb); });  // offline → try local cache
 }
 
 // Copy locally-uploaded (data:) letter GIFs from `oldC` into `newC` where newC lacks one.
@@ -1581,7 +1631,7 @@ function stopSync() {
 // ── REFEREE FIREBASE STATE ─────────────────────
 // phase: 'arrival' (team says they're at the stop) or 'challenge' (a single challenge is done)
 function pushRefState(phase, status) {
-  if (!sessionCode) return;
+  if (previewMode || !sessionCode) return;
   var db = getFirebase(); if (!db) return;
   db.ref('sessions/' + sessionCode + '/state/' + group).set({
     phase: phase,
@@ -1605,6 +1655,7 @@ function listenForArrivalApproval(s) {
     if (d.status === 'approved') {
       ref.off();
       document.getElementById('pending-overlay').classList.remove('show');
+      playApprovalChime();
       arrived = true;
       unlockClue(s);
       checkProximityWildcards();
@@ -1627,6 +1678,7 @@ function listenForChallengeApproval() {
     if (d.status === 'approved') {
       ref.off();
       document.getElementById('pending-overlay').classList.remove('show');
+      playApprovalChime();
       earnedLetters = d.earnedLetters || earnedLetters;
       var letters = d.awardedLetters || [];
       var gifs = d.awardedGifs || [];
@@ -1816,6 +1868,29 @@ function refereeReject() {
 }
 
 // ── ALARM + VIBRATION ─────────────────────────
+// Cheerful rising chime + vibration — played on the player's device when the
+// referee approves (arrival or challenge).
+function playApprovalChime() {
+  if (navigator.vibrate) navigator.vibrate([120, 60, 120]);
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    var ctx = audioCtx;
+    var notes = [784, 988, 1319]; // G5 B5 E6 — bright major arpeggio
+    notes.forEach(function(freq, i) {
+      var osc = ctx.createOscillator();
+      var gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.value = freq;
+      osc.connect(gain); gain.connect(ctx.destination);
+      var t = ctx.currentTime + i * 0.09;
+      gain.gain.setValueAtTime(0.0001, t);
+      gain.gain.exponentialRampToValueAtTime(0.35, t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.25);
+      osc.start(t); osc.stop(t + 0.28);
+    });
+  } catch(e) {}
+}
+
 function triggerArrivalAlarm() {
   // Vibrate: 3 short bursts
   if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 400]);
@@ -1877,6 +1952,7 @@ function manualUnlock() {
 
 function unlockClue(s) {
   triggerArrivalAlarm();
+  startPlayTimer();   // total play time starts at first arrival
   challengeIdx = 0;
   var locked = document.getElementById('clue-locked');
   locked.classList.add('shake');
@@ -2053,6 +2129,7 @@ function markChallengeDone() {
 
 // Check whether a referee is currently watching this player's group.
 function refereeIsPresent(cb) {
+  if (previewMode) { cb(false); return; }
   if (!sessionCode) { cb(false); return; }
   var db = getFirebase(); if (!db) { cb(false); return; }
   db.ref('sessions/' + sessionCode + '/refPresence/' + group).once('value')
@@ -2210,8 +2287,10 @@ function advanceStop() {
 function finishGame() {
   stopGPS();
   stopSync();
+  stopPlayTimer();
   var stops = getStops();
-  document.getElementById('finish-sub').textContent = (group === 'A' ? (course.nameA||'Team A') : (course.nameB||'Team B')) + ' · ' + earnedLetters.length + ' letters verzameld';
+  var totalTime = playStartMs ? (function(){ var s=Math.floor((Date.now()-playStartMs)/1000); return Math.floor(s/60)+':'+(s%60<10?'0':'')+(s%60); })() : null;
+  document.getElementById('finish-sub').textContent = (group === 'A' ? (course.nameA||'Team A') : (course.nameB||'Team B')) + ' · ' + earnedLetters.length + ' letters' + (totalTime ? ' · ⏱ ' + totalTime : '');
   document.getElementById('final-num').textContent = earnedLetters.join('') || '—';
   document.getElementById('final-rows').innerHTML = stops.map(function(s,i){
     var done = i < stopIdx;
@@ -2245,6 +2324,24 @@ function finishGame() {
 
 var gameStartTime = 0;
 
+// ── PLAY TIMER (starts at first arrival, for fun) ──
+var playStartMs = 0;
+var playTimerInterval = null;
+
+function startPlayTimer() {
+  if (!playStartMs) { playStartMs = Date.now(); pushGameState(); }
+  if (playTimerInterval) return;
+  updatePlayTimer();
+  playTimerInterval = setInterval(updatePlayTimer, 1000);
+}
+function updatePlayTimer() {
+  if (!playStartMs) return;
+  var s = Math.floor((Date.now() - playStartMs) / 1000);
+  var el = document.getElementById('hdr-timer');
+  if (el) el.textContent = Math.floor(s / 60) + ':' + (s % 60 < 10 ? '0' : '') + (s % 60);
+}
+function stopPlayTimer() { if (playTimerInterval) { clearInterval(playTimerInterval); playTimerInterval = null; } }
+
 function leaveSession() {
   if (!confirm('Sessie verlaten en terug naar het beginscherm?')) return;
   stopSync(); sessionCode = null; canEditCourse = false;
@@ -2270,11 +2367,11 @@ function resetSession() {
 }
 
 function pushGameState() {
-  if (!sessionCode) return;
+  if (previewMode || !sessionCode) return;
   var db = getFirebase(); if (!db) return;
   db.ref('sessions/' + sessionCode + '/gameState/' + group).set({
     stopIdx: stopIdx, challengeIdx: challengeIdx,
-    scores: scores, earnedLetters: earnedLetters, ts: Date.now()
+    scores: scores, earnedLetters: earnedLetters, playStartMs: playStartMs, ts: Date.now()
   });
 }
 
@@ -2286,17 +2383,77 @@ function loadGameState(cb) {
 }
 
 function leaveGame() {
+  if (previewMode) {
+    previewMode = false;
+    stopGPS(); stopPlayTimer();
+    show('screen-edit');
+    return;
+  }
   if (!confirm('Spel verlaten? Je voortgang is opgeslagen.')) return;
   pushGameState();
   stopGPS();
   show('screen-session-menu');
 }
 
+// Preview the current (unsaved) route from hole 1 without GPS or referee.
+function previewRoute() {
+  var sfx = window.innerWidth >= 900 ? 'desktop' : 'mobile';
+  course.A = readEditor('A');
+  course.B = readEditor('B');
+  course.wildcards = readWildcards(sfx);
+  course.bonus = readBonus(sfx);
+  course.puzzle = readPuzzle(sfx);
+  var g = (course.A && course.A.length) ? 'A' : 'B';
+  if (!course[g] || !course[g].length) { toast('Voeg eerst een stop toe'); return; }
+  previewMode = true;
+  group = g;
+  stopIdx = 0; challengeIdx = 0; doneChallenges = {}; earnedLetters = []; scores = [];
+  photos = {}; pickedScore = null; arrived = false; bonusInserted = false; bonusPending = false;
+  isReferee = false; playStartMs = 0; stopPlayTimer();
+  startGame();
+  toast('👁️ Preview gestart');
+}
+
 function restart() { stopGPS(); stopSync(); photos = {}; sessionCode = null; playerId = null; canEditCourse = false; show('screen-intro'); }
+
+// ── ONBOARDING / HOW-TO ───────────────────────
+var HOWTO_STEPS = [
+  { t: '🍺 Welkom bij Pub Golf', b: 'Een route langs kroegen (of stops) met grappige challenges. Werk samen, verzamel letters en los aan het eind de geheime zin op!' },
+  { t: '📍 Aankomen', b: 'Loop naar de stop op de kaart. Zodra je er bent (of via de knop "Ik ben er") komt de challenge vrij. Kijkt er een scheidsrechter mee, dan bevestigt die eerst dat je er bent.' },
+  { t: '🎯 Challenges', b: 'Voer de opdracht uit en druk op "Challenge klaar!". Bij meerdere challenges per stop swipe je ertussen en zend je ze één voor één in. Soms is een foto verplicht.' },
+  { t: '🔤 Letters', b: 'Voor elke goedgekeurde challenge krijg je kort een letter te zien (met een grappige GIF). Die letters vormen samen een geheime zin.' },
+  { t: '🏁 Eindspel', b: 'Bij de laatste stop maak je met al je letters de zin — sleep ze naar de juiste plek. Fout = tijdstraf. Wie het snelst klaar is, wint de eer!' }
+];
+var howtoIdx = 0;
+function openHowTo() { howtoIdx = 0; renderHowto(); document.getElementById('howto-overlay').classList.add('show'); }
+function renderHowto() {
+  var s = HOWTO_STEPS[howtoIdx];
+  document.getElementById('howto-body').innerHTML =
+    '<div class="session-title" style="font-size:30px;">' + s.t + '</div>' +
+    '<div style="font-size:14px; line-height:1.6; color:var(--text); margin-top:8px;">' + s.b + '</div>' +
+    '<div style="font-size:11px; color:var(--muted); margin-top:14px; letter-spacing:2px;">' + (howtoIdx+1) + ' / ' + HOWTO_STEPS.length + '</div>';
+  document.getElementById('howto-prev').style.visibility = howtoIdx === 0 ? 'hidden' : 'visible';
+  document.getElementById('howto-next').textContent = howtoIdx === HOWTO_STEPS.length - 1 ? 'Sluiten ✓' : 'Volgende →';
+}
+function howtoStep(dir) {
+  howtoIdx += dir;
+  if (howtoIdx >= HOWTO_STEPS.length) {
+    document.getElementById('howto-overlay').classList.remove('show');
+    localStorage.setItem('pg_seen_intro', '1');
+    return;
+  }
+  if (howtoIdx < 0) howtoIdx = 0;
+  renderHowto();
+}
+// Auto-show on first ever launch
+if (!localStorage.getItem('pg_seen_intro')) {
+  setTimeout(openHowTo, 600);
+}
 
 // ── PUZZLE ────────────────────────────────────
 var puzzleAnswer = [];
 var puzzleSlotFilled = [];
+var puzzleSentence = '';
 var puzzlePenaltyTime = 0;
 var puzzlePenaltyTimer = null;
 var puzzleTimerSecs = 0;
@@ -2308,12 +2465,11 @@ function formatPuzzleTime(s) {
 
 function openPuzzle() {
   var puz = course.puzzle || {};
-  // Determine correct answer
-  if (puz.answer && puz.answer.trim()) {
-    puzzleAnswer = puz.answer.toUpperCase().replace(/[^A-Z]/g, '').split('');
-  } else {
-    puzzleAnswer = earnedLetters.slice();
-  }
+  // Determine correct answer, preserving word boundaries (spaces)
+  var raw = (puz.answer && puz.answer.trim()) ? puz.answer.toUpperCase() : earnedLetters.join('');
+  var words = raw.split(/\s+/).map(function(w) { return w.replace(/[^A-Z]/g, ''); }).filter(Boolean);
+  puzzleAnswer = words.join('').split('');   // flat letters for win-check
+  puzzleSentence = words.join(' ');
   puzzleSlotFilled = puzzleAnswer.map(function() { return null; });
 
   // Shuffle letters for pool display
@@ -2345,14 +2501,22 @@ function openPuzzle() {
     pool.appendChild(tile);
   });
 
-  puzzleAnswer.forEach(function(letter, si) {
-    var slot = document.createElement('div');
-    slot.className = 'puzzle-slot';
-    slot.dataset.slotIdx = si;
-    slot.dataset.answer = letter;
-    slot.textContent = '?';
-    addDropToSlot(slot);
-    slots.appendChild(slot);
+  // Slots grouped per word, with gaps between words
+  var slotIdx = 0;
+  words.forEach(function(word) {
+    var wordEl = document.createElement('div');
+    wordEl.className = 'puzzle-word';
+    word.split('').forEach(function(letter) {
+      var slot = document.createElement('div');
+      slot.className = 'puzzle-slot';
+      slot.dataset.slotIdx = slotIdx;
+      slot.dataset.answer = letter;
+      slot.textContent = '?';
+      addDropToSlot(slot);
+      wordEl.appendChild(slot);
+      slotIdx++;
+    });
+    slots.appendChild(wordEl);
   });
 
   // Show intro overlay
@@ -2469,9 +2633,8 @@ function checkPuzzleWin() {
   if (allCorrect) {
     clearInterval(puzzlePenaltyTimer);
     clearInterval(puzzleTimerInterval);
-    var sentence = puzzleAnswer.join('');
     var finalTime = formatPuzzleTime(puzzleTimerSecs);
-    document.getElementById('puzzle-score').textContent = '🎉 Gelukt! "' + sentence + '" — Tijd: ' + finalTime;
+    document.getElementById('puzzle-score').textContent = '🎉 Gelukt! "' + puzzleSentence + '" — Tijd: ' + finalTime;
     var gifUrl = (course.puzzle || {}).completionGifUrl || '';
     if (gifUrl) {
       showLetterReveal('🏆', gifUrl, function() { finishGame(); });
@@ -2825,6 +2988,7 @@ function saveRoute() {
   course.puzzle = readPuzzle(wcSuffix);
   localStorage.setItem('pg_course', JSON.stringify(course));
   if (sessionCode) {
+    localStorage.setItem('pg_course_' + sessionCode, JSON.stringify(course)); // offline cache
     var db = getFirebase();
     if (db) db.ref('courses/' + sessionCode).set(stripLocalGifsForFirebase(course));
   }
