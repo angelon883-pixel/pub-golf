@@ -958,12 +958,12 @@ var DEFAULTS = {
   nameB: 'Team B',
   refereeCode: '',
   wildcards: [
-    "Drink je glas omhoog houdend met gestrekte arm",
-    "Wissel glas met de persoon naast je",
-    "Drink op je knieën",
-    "Elke slok moet je eerst een grapje vertellen",
-    "Finish in stille modus — niemand mag praten",
-    "Drink met je ogen dicht"
+    { text: "Drink je glas omhoog houdend met gestrekte arm", photo: false },
+    { text: "Wissel glas met de persoon naast je", photo: false },
+    { text: "Drink op je knieën", photo: false },
+    { text: "Elke slok moet je eerst een grapje vertellen", photo: false },
+    { text: "Finish in stille modus — niemand mag praten", photo: false },
+    { text: "Drink met je ogen dicht", photo: false }
   ],
   bonus: {
     enabled: true,
@@ -996,6 +996,12 @@ function migrateCourse(c) {
     });
   });
   if (!c.refereeCode) c.refereeCode = '';
+  // wildcards: strings → { text, photo }
+  if (Array.isArray(c.wildcards)) {
+    c.wildcards = c.wildcards.map(function(w) {
+      return (typeof w === 'string') ? { text: w, photo: false } : { text: w.text || '', photo: !!w.photo };
+    });
+  }
   return c;
 }
 
@@ -1145,7 +1151,7 @@ function renderStop() {
   // wildcard from current challenge
   var wc = document.getElementById('wildcard-banner');
   if (ch && ch.wildcard && course.wildcards && course.wildcards.length > 0) {
-    document.getElementById('wildcard-text').textContent = course.wildcards[Math.floor(Math.random() * course.wildcards.length)];
+    document.getElementById('wildcard-text').textContent = wcText(course.wildcards[Math.floor(Math.random() * course.wildcards.length)]);
     wc.classList.add('visible');
   } else {
     wc.classList.remove('visible');
@@ -1303,12 +1309,16 @@ function checkProximityWildcards() {
     (st.challenges || []).forEach(function(ch) {
       if (ch.wildcard && ch.wildcardTriggerAtStop === stopIdx && course.wildcards && course.wildcards.length > 0) {
         // Show a random wildcard from the pool
-        var wc = course.wildcards[Math.floor(Math.random() * course.wildcards.length)];
+        var wc = wcText(course.wildcards[Math.floor(Math.random() * course.wildcards.length)]);
         toast('🃏 Wildcard: ' + wc);
       }
     });
   });
 }
+
+function wcText(w) { return (w && typeof w === 'object') ? (w.text || '') : (w || ''); }
+
+var usedWildcards = {};   // index -> true once completed this game
 
 // Persistent wildcards panel — viewable any time, all game long.
 function openWildcards() {
@@ -1318,10 +1328,90 @@ function openWildcards() {
     box.innerHTML = '<div style="font-size:13px; color:var(--muted);">Geen wildcards ingesteld.</div>';
   } else {
     box.innerHTML = wcs.map(function(w, i) {
-      return '<div class="wildcard-card"><div class="wildcard-card-num">Wildcard ' + (i+1) + '</div>' + safeVal(w) + '</div>';
+      var used = !!usedWildcards[i];
+      var needsPhoto = !!(w && w.photo);
+      return '<div class="wildcard-card"' + (used ? ' style="opacity:0.5;"' : '') + '>' +
+        '<div class="wildcard-card-num">Wildcard ' + (i+1) + (needsPhoto ? ' · 📸' : '') + '</div>' +
+        safeVal(wcText(w)) +
+        (used
+          ? '<div style="margin-top:8px; font-size:12px; color:var(--green);">✓ Gebruikt</div>'
+          : '<button class="btn-session-join" style="margin-top:10px; width:100%; border-color:var(--gold); color:var(--gold);" onclick="submitWildcard(' + i + ')">✓ Voltooid — steel een letter</button>') +
+        '</div>';
     }).join('');
   }
   document.getElementById('wildcards-overlay').classList.add('show');
+}
+
+// Submit a completed wildcard (optionally with photo) → referee approval → steal a letter.
+function submitWildcard(i) {
+  var w = (course.wildcards || [])[i];
+  if (!w || usedWildcards[i]) return;
+  // photo required?
+  if (w.photo && !photos['wc-' + i]) {
+    var input = document.getElementById('camera-input');
+    input.value = '';
+    input.onchange = function() {
+      if (!input.files || !input.files[0]) return;
+      var r = new FileReader();
+      r.onload = function(e) { photos['wc-' + i] = e.target.result; toast('📸 Foto opgeslagen'); submitWildcard(i); };
+      r.readAsDataURL(input.files[0]);
+    };
+    input.click();
+    return;
+  }
+  refereeIsPresent(function(present) {
+    if (present) {
+      document.getElementById('wildcards-overlay').classList.remove('show');
+      document.getElementById('pending-overlay').classList.add('show');
+      pushWildcardState('pending', i);
+      listenForWildcardApproval(i);
+    } else {
+      performSteal(i);
+    }
+  });
+}
+
+function pushWildcardState(status, i) {
+  if (previewMode || !sessionCode) return;
+  var db = getFirebase(); if (!db) return;
+  db.ref('sessions/' + sessionCode + '/state/' + group).set({
+    phase: 'wildcard', wildcardIdx: i, wildcardText: wcText((course.wildcards || [])[i]),
+    status: status, earnedLetters: earnedLetters, stopIdx: stopIdx, challengeIdx: challengeIdx,
+    stopName: getStops()[stopIdx] ? getStops()[stopIdx].name : '', ts: Date.now()
+  });
+}
+
+function listenForWildcardApproval(i) {
+  if (!sessionCode) return;
+  var db = getFirebase(); if (!db) return;
+  var ref = db.ref('sessions/' + sessionCode + '/state/' + group);
+  ref.on('value', function(snap) {
+    var d = snap.val();
+    if (!d || d.phase !== 'wildcard') return;
+    if (d.status === 'approved') {
+      ref.off();
+      document.getElementById('pending-overlay').classList.remove('show');
+      playApprovalChime();
+      performSteal(i);
+    } else if (d.status === 'rejected') {
+      ref.off();
+      document.getElementById('pending-overlay').classList.remove('show');
+      toast('❌ Wildcard afgekeurd');
+    }
+  });
+}
+
+function performSteal(i) {
+  usedWildcards[i] = true;
+  var otherName = group === 'A' ? (course.nameB || 'Team B') : (course.nameA || 'Team A');
+  var myName = group === 'A' ? (course.nameA || 'Team A') : (course.nameB || 'Team B');
+  var otherG = group === 'A' ? 'B' : 'A';
+  if (!previewMode && sessionCode) {
+    var db = getFirebase();
+    if (db) db.ref('sessions/' + sessionCode + '/steals/' + otherG).push({ ts: Date.now(), byName: myName });
+  }
+  toast('🃏 Wildcard voltooid — ' + otherName + ' verliest een letter!');
+  openWildcards(); // refresh (shows "gebruikt")
 }
 
 function updateDist(dist, bear) {
@@ -1391,6 +1481,7 @@ function startGame() {
   show('screen-game');
   document.getElementById('preview-banner').style.display = previewMode ? 'block' : 'none';
   if (!previewMode) startGPS();
+  usedWildcards = {};
   if (sessionCode && !previewMode) {
     startSync();
     // Listen for referee-triggered session reset
@@ -1402,8 +1493,26 @@ function startGame() {
           setTimeout(function() { leaveGame(); }, 2000);
         }
       });
+      // Listen for wildcard steals aimed at our team
+      db.ref('sessions/' + sessionCode + '/steals/' + group).on('child_added', function(snap) {
+        var s = snap.val();
+        if (!s || (s.ts || 0) < gameStartTime) return;   // ignore old steals
+        applySteal(s.byName);
+      });
     }
   }
+}
+
+// A wildcard stole one of our letters — remove a random earned letter.
+function applySteal(byName) {
+  byName = byName || 'Het andere team';
+  if (!earnedLetters.length) { toast('🃏 ' + byName + ' gebruikte een wildcard (je had geen letters)'); return; }
+  var idx = Math.floor(Math.random() * earnedLetters.length);
+  var lost = earnedLetters.splice(idx, 1)[0];
+  pushGameState();
+  document.getElementById('hdr-score').textContent = earnedLetters.length;
+  if (navigator.vibrate) navigator.vibrate([300, 100, 300]);
+  toast('🃏 ' + byName + ' stal je letter "' + lost + '"!');
 }
 
 // ── SESSION / LIVE SCORE + LOCATION (Firebase Realtime Database) ──────────────────────
@@ -1850,7 +1959,11 @@ function renderRefereeView(d) {
   // Letter(s) the current challenge would award
   var pairs = stop ? lettersForChallenge(stop, ci, (d && d.earnedLetters || []).length) : [];
 
-  if (phase === 'arrival') {
+  if (phase === 'wildcard') {
+    document.getElementById('ref-challenge-num').textContent = '🃏 Wildcard';
+    document.getElementById('ref-clue-title').textContent = '🃏 Wildcard voltooid?';
+    document.getElementById('ref-clue-body').textContent = (d && d.wildcardText) || '—';
+  } else if (phase === 'arrival') {
     document.getElementById('ref-challenge-num').textContent = 'Aankomst';
     document.getElementById('ref-clue-title').textContent = '📍 Team zegt: wij zijn er';
     document.getElementById('ref-clue-body').textContent = 'Bevestig dat het team bij ' + (stop ? stop.name : 'de stop') + ' is voordat de challenge vrijkomt.';
@@ -1878,7 +1991,10 @@ function renderRefereeView(d) {
     statusEl.className = 'referee-status pending';
     panel.style.display = 'block';
     row.innerHTML = '';
-    if (phase === 'arrival') {
+    if (phase === 'wildcard') {
+      statusEl.textContent = '🃏 Wildcard — beoordeel';
+      row.innerHTML = '<div style="font-size:12px;color:var(--muted);">Goedkeuren = een letter weg bij dit team\'s tegenstander.</div>';
+    } else if (phase === 'arrival') {
       statusEl.textContent = '📍 Team is aangekomen — bevestig';
       row.innerHTML = '<div style="font-size:12px;color:var(--muted);">Goedkeuren = challenge vrijgeven.</div>';
     } else {
@@ -2896,8 +3012,9 @@ function renderPuzzleEditor(suffix) {
     '<div class="bonus-editor-sub">Configureer het eindspel waarbij spelers letters slepen.</div>' +
     '<div class="field full"><label>Intro-tekst</label>' +
       '<textarea id="puzzle-intro-' + suffix + '" rows="3">' + safeText(p.introText || '') + '</textarea></div>' +
-    '<div class="field full"><label>Verwacht antwoord <span style="color:var(--muted);font-size:11px;">(leeg = volgorde van verdiende letters)</span></label>' +
-      '<input type="text" id="puzzle-answer-' + suffix + '" value="' + safeVal(p.answer || '') + '" placeholder="bijv. PUBGOLF" style="text-transform:uppercase;"></div>' +
+    '<div class="field full"><label>Verwacht antwoord / zin</label>' +
+      '<input type="text" id="puzzle-answer-' + suffix + '" value="' + safeVal(p.answer || '') + '" placeholder="bijv. PUB GOLF ROCKS" style="text-transform:uppercase;"></div>' +
+    '<button class="btn-wc-add" style="margin-bottom:14px;" onclick="distributeLetters()">🎲 Verdeel letters willekeurig over de stops</button>' +
     '<div class="field full"><label>Voltooiings-GIF</label>' +
       '<div style="display:flex;gap:6px;">' +
         '<input type="text" id="puzzle-gif-' + suffix + '" value="' + safeVal(p.completionGifUrl || '') + '" placeholder="https://...gif" style="flex:1;">' +
@@ -2906,6 +3023,39 @@ function renderPuzzleEditor(suffix) {
         '</label>' +
       '</div></div>' +
   '</div>';
+}
+
+function shuffleArr(a) {
+  for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; }
+  return a;
+}
+
+// Distribute the answer's letters randomly across each team's challenges.
+// More letters than challenges → some challenges get multiple letters.
+function distributeLetters() {
+  var sfx = window.innerWidth >= 900 ? 'desktop' : 'mobile';
+  // capture current editor edits first
+  course.A = readEditor('A');
+  course.B = readEditor('B');
+  course.wildcards = readWildcards(sfx);
+  course.bonus = readBonus(sfx);
+  course.puzzle = readPuzzle(sfx);
+
+  var ans = (course.puzzle.answer || '').toUpperCase().replace(/[^A-Z]/g, '');
+  if (!ans) { toast('Vul eerst een antwoordwoord/zin in'); return; }
+
+  ['A', 'B'].forEach(function(g) {
+    var chs = [];
+    (course[g] || []).forEach(function(s) { (s.challenges || []).forEach(function(c) { c.letter = ''; chs.push(c); }); });
+    if (!chs.length) return;
+    var letters = shuffleArr(ans.split(''));
+    var order = shuffleArr(chs.map(function(_, i) { return i; }));   // random which challenges get extras
+    letters.forEach(function(L, k) { chs[order[k % order.length]].letter += L; });
+  });
+
+  renderEditor('A'); renderEditor('B');
+  renderPuzzleEditor('mobile'); renderPuzzleEditor('desktop');
+  toast('🎲 ' + ans.length + ' letters willekeurig verdeeld');
 }
 
 function readPuzzle(suffix) {
@@ -2926,11 +3076,15 @@ function renderWildcardEditor(suffix) {
   var wcs = course.wildcards || [];
   var html = '<div class="wildcard-editor">' +
     '<div class="wildcard-editor-title">🃏 Wildcard Pool</div>' +
-    '<div class="wildcard-editor-sub">Wordt random getoond bij wildcard holes.</div>' +
+    '<div class="wildcard-editor-sub">Altijd beschikbaar in het spel. Voltooid = een letter weg bij het andere team.</div>' +
     '<div class="wildcard-list" id="wc-list-'+suffix+'">';
   wcs.forEach(function(w, i) {
-    html += '<div class="wildcard-item">' +
-      '<input type="text" id="wc-'+suffix+'-'+i+'" value="'+safeVal(w)+'">' +
+    var text = (w && typeof w === 'object') ? (w.text || '') : (w || '');
+    var photo = !!(w && w.photo);
+    html += '<div class="wildcard-item" style="flex-wrap:wrap;">' +
+      '<input type="text" id="wc-'+suffix+'-'+i+'" value="'+safeVal(text)+'" style="flex:1;">' +
+      '<label style="display:flex; align-items:center; gap:5px; font-size:11px; color:var(--muted); white-space:nowrap;">📸' +
+        '<input type="checkbox" id="wc-photo-'+suffix+'-'+i+'"'+(photo?' checked':'')+'></label>' +
       '<button class="btn-wc-remove" onclick="removeWildcard(\''+suffix+'\','+i+')">×</button>' +
       '</div>';
   });
@@ -2940,7 +3094,7 @@ function renderWildcardEditor(suffix) {
 
 function addWildcard(suffix) {
   course.wildcards = course.wildcards || [];
-  course.wildcards.push('Nieuw wildcard');
+  course.wildcards.push({ text: 'Nieuw wildcard', photo: false });
   renderWildcardEditor(suffix);
   // sync other
   var other = suffix === 'mobile' ? 'desktop' : 'mobile';
@@ -3032,7 +3186,10 @@ function readWildcards(suffix) {
   var wcs = course.wildcards || [];
   wcs.forEach(function(_, i) {
     var el = document.getElementById('wc-'+suffix+'-'+i);
-    if (el) result.push(el.value);
+    if (el) {
+      var photoEl = document.getElementById('wc-photo-'+suffix+'-'+i);
+      result.push({ text: el.value, photo: !!(photoEl && photoEl.checked) });
+    }
   });
   return result;
 }
