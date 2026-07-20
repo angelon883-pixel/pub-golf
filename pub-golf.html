@@ -3308,7 +3308,7 @@ function importCSV() {
       par:          parseInt(cols[idx.par]) || 2,
       photo:        /ja/i.test(cols[idx.foto] || ''),
       wildcard:     /ja/i.test(cols[idx.wildcard] || ''),
-      letter:       idx.letter >= 0 ? (cols[idx.letter] || '').trim().toUpperCase().charAt(0) : '',
+      letter:       idx.letter >= 0 ? (cols[idx.letter] || '').toUpperCase().replace(/[^A-Z]/g, '') : '',
       letterGifUrl: idx.gifUrl >= 0 ? (cols[idx.gifUrl] || '').trim() : ''
     };
     if (stopMap[g][key]) {
