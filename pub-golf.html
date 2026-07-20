@@ -2067,10 +2067,10 @@ function renderChallengeView() {
 
   var isDone = !!doneChallenges[stopIdx + '-' + challengeIdx];
 
-  // photo section for this challenge (hidden once done)
+  // photo section for this challenge (hidden once done, and hidden in preview)
   var photoSec = document.getElementById('photo-section');
   var preview = document.getElementById('photo-preview');
-  if (ch && ch.photo && !isDone) {
+  if (ch && ch.photo && !isDone && !previewMode) {
     photoSec.classList.add('visible');
     var photoKey = stopIdx + '-' + challengeIdx;
     if (photos[photoKey]) {
@@ -2175,8 +2175,8 @@ function downloadStripPhoto(key) {
 function markChallengeDone() {
   var s = getStops()[stopIdx];
   var ch = (s.challenges || [])[challengeIdx];
-  // validate photo for this challenge only
-  if (ch && ch.photo && !photos[stopIdx + '-' + challengeIdx]) {
+  // validate photo for this challenge only (skipped in preview)
+  if (!previewMode && ch && ch.photo && !photos[stopIdx + '-' + challengeIdx]) {
     toast('📸 Maak eerst een groepsfoto!');
     document.getElementById('photo-required-note').style.display = 'block';
     return;
