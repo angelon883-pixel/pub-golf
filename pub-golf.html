@@ -2183,19 +2183,24 @@ function renderChallengeView() {
 
   var isDone = !!doneChallenges[stopIdx + '-' + challengeIdx];
 
-  // photo section for this challenge (hidden once done, and hidden in preview)
+  // photo section for this challenge (hidden once done)
   var photoSec = document.getElementById('photo-section');
   var preview = document.getElementById('photo-preview');
-  if (ch && ch.photo && !isDone && !previewMode) {
+  var note = document.getElementById('photo-required-note');
+  if (ch && ch.photo && !isDone) {
     photoSec.classList.add('visible');
     var photoKey = stopIdx + '-' + challengeIdx;
     if (photos[photoKey]) {
       document.getElementById('photo-img').src = photos[photoKey];
       preview.classList.add('has-photo');
-      document.getElementById('photo-required-note').style.display = 'none';
+      note.style.display = 'none';
     } else {
       preview.classList.remove('has-photo');
-      document.getElementById('photo-required-note').style.display = 'block';
+      // In preview: show that a photo would be required, but don't force it
+      note.textContent = previewMode
+        ? '📸 Hier zou een foto verplicht zijn (in preview niet nodig)'
+        : '⚠️ Foto verplicht voor je verder kunt';
+      note.style.display = 'block';
     }
   } else {
     photoSec.classList.remove('visible');
