@@ -3065,7 +3065,7 @@ function readPuzzle(suffix) {
   if (!intro) return course.puzzle || {};
   return {
     introText: intro.value.trim(),
-    answer: (ans.value || '').toUpperCase().replace(/[^A-Z]/g, ''),
+    answer: (ans.value || '').toUpperCase().replace(/[^A-Z ]/g, '').replace(/\s+/g, ' ').trim(),
     completionGifUrl: gif.value.trim()
   };
 }
