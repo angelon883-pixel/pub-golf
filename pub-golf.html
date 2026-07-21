@@ -3135,15 +3135,15 @@ function renderWildcardEditor(suffix) {
 }
 
 function addWildcard(suffix) {
-  course.wildcards = course.wildcards || [];
+  course.wildcards = readWildcards(suffix);   // keep current edits before re-render
   course.wildcards.push({ text: 'Nieuw wildcard', description: '', photo: false });
   renderWildcardEditor(suffix);
-  // sync other
   var other = suffix === 'mobile' ? 'desktop' : 'mobile';
   renderWildcardEditor(other);
 }
 
 function removeWildcard(suffix, i) {
+  course.wildcards = readWildcards(suffix);   // keep current edits before re-render
   course.wildcards.splice(i, 1);
   renderWildcardEditor(suffix);
   var other = suffix === 'mobile' ? 'desktop' : 'mobile';
