@@ -2654,8 +2654,11 @@ function howtoStep(dir) {
   if (howtoIdx < 0) howtoIdx = 0;
   renderHowto();
 }
-// Always show the how-to when the app opens
-setTimeout(openHowTo, 600);
+// Show the how-to when the app opens — only on the intro screen, never over gameplay
+setTimeout(function() {
+  var intro = document.getElementById('screen-intro');
+  if (intro && intro.classList.contains('active')) openHowTo();
+}, 600);
 
 // ── PUZZLE ────────────────────────────────────
 var puzzleAnswer = [];
