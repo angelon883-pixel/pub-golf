@@ -1000,7 +1000,9 @@ function migrateCourse(c) {
   // wildcards: strings → { text, photo }
   if (Array.isArray(c.wildcards)) {
     c.wildcards = c.wildcards.map(function(w) {
-      return (typeof w === 'string') ? { text: w, photo: false } : { text: w.text || '', photo: !!w.photo };
+      return (typeof w === 'string')
+        ? { text: w, description: '', photo: false }
+        : { text: w.text || '', description: w.description || '', photo: !!w.photo };
     });
   }
   return c;
@@ -1332,9 +1334,16 @@ function openWildcards() {
     box.innerHTML = wcs.map(function(w, i) {
       var used = !!usedWildcards[i];
       var needsPhoto = !!(w && w.photo);
+      var desc = (w && w.description) ? w.description : '';
       return '<div class="wildcard-card"' + (used ? ' style="opacity:0.5;"' : '') + '>' +
         '<div class="wildcard-card-num">Wildcard ' + (i+1) + (needsPhoto ? ' · 📸' : '') + '</div>' +
-        safeVal(wcText(w)) +
+        '<div class="wc-title-row" onclick="toggleWcDesc(' + i + ')" style="cursor:pointer; display:flex; align-items:center; justify-content:space-between; gap:8px; font-weight:bold;">' +
+          '<span>' + safeVal(wcText(w)) + '</span>' +
+          (desc ? '<span id="wc-chev-' + i + '" style="color:var(--gold);">▸</span>' : '') +
+        '</div>' +
+        (desc
+          ? '<div id="wc-desc-' + i + '" style="display:none; margin-top:8px; font-size:13px; color:#ddc0a0; line-height:1.5; white-space:pre-wrap;">' + safeVal(desc) + '</div>'
+          : '') +
         (used
           ? '<div style="margin-top:8px; font-size:12px; color:var(--green);">✓ Gebruikt</div>'
           : '<button class="btn-session-join" style="margin-top:10px; width:100%; border-color:var(--gold); color:var(--gold);" onclick="submitWildcard(' + i + ')">✓ Voltooid — steel een letter</button>') +
@@ -1342,6 +1351,15 @@ function openWildcards() {
     }).join('');
   }
   document.getElementById('wildcards-overlay').classList.add('show');
+}
+
+function toggleWcDesc(i) {
+  var d = document.getElementById('wc-desc-' + i);
+  var chev = document.getElementById('wc-chev-' + i);
+  if (!d) return;
+  var open = d.style.display === 'none';
+  d.style.display = open ? 'block' : 'none';
+  if (chev) chev.textContent = open ? '▾' : '▸';
 }
 
 // Submit a completed wildcard (optionally with photo) → referee approval → steal a letter.
@@ -1378,6 +1396,7 @@ function pushWildcardState(status, i) {
   var db = getFirebase(); if (!db) return;
   db.ref('sessions/' + sessionCode + '/state/' + group).set({
     phase: 'wildcard', wildcardIdx: i, wildcardText: wcText((course.wildcards || [])[i]),
+    wildcardDesc: ((course.wildcards || [])[i] || {}).description || '',
     status: status, earnedLetters: earnedLetters, stopIdx: stopIdx, challengeIdx: challengeIdx,
     stopName: getStops()[stopIdx] ? getStops()[stopIdx].name : '', ts: Date.now()
   });
@@ -1974,8 +1993,8 @@ function renderRefereeView(d) {
 
   if (phase === 'wildcard') {
     document.getElementById('ref-challenge-num').textContent = '🃏 Wildcard';
-    document.getElementById('ref-clue-title').textContent = '🃏 Wildcard voltooid?';
-    document.getElementById('ref-clue-body').textContent = (d && d.wildcardText) || '—';
+    document.getElementById('ref-clue-title').textContent = (d && d.wildcardText) || '🃏 Wildcard';
+    document.getElementById('ref-clue-body').textContent = (d && d.wildcardDesc) || 'Wildcard voltooid?';
   } else if (phase === 'arrival') {
     document.getElementById('ref-challenge-num').textContent = 'Aankomst';
     document.getElementById('ref-clue-title').textContent = '📍 Team zegt: wij zijn er';
@@ -3101,12 +3120,14 @@ function renderWildcardEditor(suffix) {
     '<div class="wildcard-list" id="wc-list-'+suffix+'">';
   wcs.forEach(function(w, i) {
     var text = (w && typeof w === 'object') ? (w.text || '') : (w || '');
+    var desc = (w && typeof w === 'object') ? (w.description || '') : '';
     var photo = !!(w && w.photo);
-    html += '<div class="wildcard-item" style="flex-wrap:wrap;">' +
-      '<input type="text" id="wc-'+suffix+'-'+i+'" value="'+safeVal(text)+'" style="flex:1;">' +
+    html += '<div class="wildcard-item" style="flex-wrap:wrap; gap:6px;">' +
+      '<input type="text" id="wc-'+suffix+'-'+i+'" value="'+safeVal(text)+'" placeholder="Titel" style="flex:1; min-width:140px;">' +
       '<label style="display:flex; align-items:center; gap:5px; font-size:11px; color:var(--muted); white-space:nowrap;">📸' +
         '<input type="checkbox" id="wc-photo-'+suffix+'-'+i+'"'+(photo?' checked':'')+'></label>' +
       '<button class="btn-wc-remove" onclick="removeWildcard(\''+suffix+'\','+i+')">×</button>' +
+      '<textarea id="wc-desc-'+suffix+'-'+i+'" placeholder="Beschrijving — wat moet er precies gebeuren?" rows="2" style="width:100%; background:#0d0400; border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:\'DM Mono\',monospace; font-size:12px; padding:8px 10px;">'+safeText(desc)+'</textarea>' +
       '</div>';
   });
   html += '</div><button class="btn-wc-add" onclick="addWildcard(\''+suffix+'\')">+ Wildcard toevoegen</button></div>';
@@ -3115,7 +3136,7 @@ function renderWildcardEditor(suffix) {
 
 function addWildcard(suffix) {
   course.wildcards = course.wildcards || [];
-  course.wildcards.push({ text: 'Nieuw wildcard', photo: false });
+  course.wildcards.push({ text: 'Nieuw wildcard', description: '', photo: false });
   renderWildcardEditor(suffix);
   // sync other
   var other = suffix === 'mobile' ? 'desktop' : 'mobile';
@@ -3209,7 +3230,8 @@ function readWildcards(suffix) {
     var el = document.getElementById('wc-'+suffix+'-'+i);
     if (el) {
       var photoEl = document.getElementById('wc-photo-'+suffix+'-'+i);
-      result.push({ text: el.value, photo: !!(photoEl && photoEl.checked) });
+      var descEl = document.getElementById('wc-desc-'+suffix+'-'+i);
+      result.push({ text: el.value, description: descEl ? descEl.value : '', photo: !!(photoEl && photoEl.checked) });
     }
   });
   return result;
